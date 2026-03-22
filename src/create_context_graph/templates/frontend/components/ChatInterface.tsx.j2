@@ -4,13 +4,18 @@ import { useState, useRef, useEffect } from "react";
 import { Box, Flex, Heading, Text, Textarea, IconButton, VStack, HStack, Badge } from "@chakra-ui/react";
 import { Send } from "lucide-react";
 import { API_BASE, DEMO_SCENARIOS } from "@/lib/config";
+import type { GraphData } from "@/lib/config";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  onGraphUpdate?: (data: GraphData) => void;
+}
+
+export function ChatInterface({ onGraphUpdate }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,6 +45,10 @@ export function ChatInterface() {
         ...prev,
         { role: "assistant", content: data.response },
       ]);
+      // Pass graph data from agent tool calls to the graph view
+      if (data.graph_data && onGraphUpdate) {
+        onGraphUpdate(data.graph_data);
+      }
     } catch {
       setMessages((prev) => [
         ...prev,

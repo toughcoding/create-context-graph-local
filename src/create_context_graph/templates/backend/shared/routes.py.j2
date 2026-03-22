@@ -6,7 +6,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.agent import handle_message
-from app.context_graph_client import execute_cypher, search_entities, get_entity_graph, get_schema
+from app.context_graph_client import (
+    execute_cypher, search_entities, get_entity_graph, get_schema,
+    get_schema_visualization, expand_node, get_collector,
+)
 from app.gds_client import check_gds_available, run_community_detection, run_pagerank
 
 router = APIRouter()
@@ -34,11 +37,22 @@ class CypherRequest(BaseModel):
     parameters: dict | None = None
 
 
+class ExpandRequest(BaseModel):
+    element_id: str
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Send a message to the AI agent."""
     try:
+        collector = get_collector()
+        collector.drain()  # clear stale results
         result = await handle_message(request.message, request.session_id)
+        # Attach graph data from tool calls if agent didn't provide any
+        if result.get("graph_data") is None:
+            collected = collector.drain()
+            if collected:
+                result["graph_data"] = {"results": collected}
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -62,6 +76,18 @@ async def graph(entity_name: str, depth: int = 2):
 async def schema():
     """Get the graph database schema."""
     return await get_schema()
+
+
+@router.get("/schema/visualization")
+async def schema_visualization():
+    """Get the graph schema as nodes and relationships for visualization."""
+    return await get_schema_visualization()
+
+
+@router.post("/expand")
+async def expand(request: ExpandRequest):
+    """Expand a node to show its immediate neighbors."""
+    return await expand_node(request.element_id)
 
 
 @router.post("/cypher")

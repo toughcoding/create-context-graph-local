@@ -1,23 +1,224 @@
-/**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
- */
-
-.heroBanner {
-  padding: 4rem 0;
-  text-align: center;
+/* Hero section */
+.hero {
   position: relative;
-  overflow: hidden;
-}
-
-@media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 2rem;
-  }
-}
-
-.buttons {
+  min-height: 90vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: linear-gradient(135deg, #0a0a1a 0%, #0d1117 40%, #0a1628 100%);
+  overflow: hidden;
+}
+
+.heroContent {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.title {
+  font-size: 4rem;
+  font-weight: 800;
+  color: white;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.titleGradient {
+  background: linear-gradient(135deg, #22c55e, #3b82f6, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.tagline {
+  font-size: 1.25rem;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 500px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.secondaryCta {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.2s;
+}
+
+.secondaryCta:hover {
+  color: white;
+}
+
+/* Features section */
+.features {
+  padding: 5rem 2rem;
+  background: var(--ifm-background-color);
+}
+
+.featuresInner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.featuresTitle {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.featuresSubtitle {
+  text-align: center;
+  color: var(--ifm-color-emphasis-600);
+  margin-bottom: 3rem;
+  font-size: 1.1rem;
+}
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.featureCard {
+  border-radius: 12px;
+  padding: 1.5rem;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-top: 3px solid var(--card-accent, var(--ifm-color-primary));
+}
+
+.featureCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.featureIcon {
+  font-size: 1.8rem;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.featureCardTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.featureCardDesc {
+  font-size: 0.9rem;
+  color: var(--ifm-color-emphasis-600);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Quick Start section */
+.quickstart {
+  padding: 5rem 2rem;
+  background: var(--ifm-background-surface-color);
+}
+
+.quickstartInner {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.quickstartTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.quickstartSubtitle {
+  color: var(--ifm-color-emphasis-600);
+  margin-bottom: 2.5rem;
+  font-size: 1.1rem;
+}
+
+/* Footer CTA */
+.footerCta {
+  padding: 5rem 2rem;
+  text-align: center;
+  background: linear-gradient(135deg, #0a0a1a 0%, #0d1117 100%);
+}
+
+.footerCtaTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 1.5rem;
+}
+
+.footerCtaInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* Responsive: tablet */
+@media (max-width: 996px) {
+  .featureGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .title {
+    font-size: 3rem;
+  }
+}
+
+/* Responsive: mobile */
+@media (max-width: 640px) {
+  .hero {
+    min-height: 80vh;
+  }
+
+  .heroContent {
+    padding: 1.5rem 1rem;
+    gap: 1.25rem;
+  }
+
+  .title {
+    font-size: 2.2rem;
+  }
+
+  .tagline {
+    font-size: 1rem;
+  }
+
+  .featureGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .features {
+    padding: 3rem 1.25rem;
+  }
+
+  .featuresTitle {
+    font-size: 1.5rem;
+  }
+
+  .quickstart {
+    padding: 3rem 1.25rem;
+  }
+
+  .quickstartTitle {
+    font-size: 1.5rem;
+  }
+
+  .footerCta {
+    padding: 3rem 1.25rem;
+  }
+
+  .footerCtaTitle {
+    font-size: 1.5rem;
+  }
 }

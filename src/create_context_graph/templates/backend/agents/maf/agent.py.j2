@@ -2,20 +2,39 @@
 
 from __future__ import annotations
 
+import inspect
 import json
+import os
 import uuid
 
 from app.config import settings
+
+{% raw %}
+# Ensure ANTHROPIC_API_KEY env var is set.
+if not os.environ.get("ANTHROPIC_API_KEY"):
+    if settings.anthropic_api_key:
+        os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
+    else:
+        from dotenv import dotenv_values
+        _key = dotenv_values("../.env").get("ANTHROPIC_API_KEY", "")
+        if _key:
+            os.environ["ANTHROPIC_API_KEY"] = _key
+{% endraw %}
+
+import anthropic
+
 from app.context_graph_client import execute_cypher, search_entities, get_entity_graph, get_schema
 
 
 SYSTEM_PROMPT = """{{ system_prompt }}"""
 
+{% raw %}
+client = anthropic.AsyncAnthropic()
+
 # ---------------------------------------------------------------------------
-# Tool registry for {{ domain.name }}
+# Modular tool registry for {{ endraw }}{{ domain.name }}{% raw %}
 # ---------------------------------------------------------------------------
 
-{% raw %}
 TOOL_REGISTRY = {}
 
 
@@ -59,56 +78,88 @@ async def get_graph_schema() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Simple modular agent with tool dispatch
+# Build Anthropic tool definitions from registry
+# ---------------------------------------------------------------------------
+
+
+def _build_tool_definitions() -> list[dict]:
+    """Build Anthropic API tool definitions from the registered tools."""
+    tools = []
+    for name, info in TOOL_REGISTRY.items():
+        func = info["function"]
+        sig = inspect.signature(func)
+        properties = {}
+        required = []
+        for pname, param in sig.parameters.items():
+            ptype = "string"
+            if param.annotation == int:
+                ptype = "integer"
+            elif param.annotation == float:
+                ptype = "number"
+            properties[pname] = {"type": ptype, "description": pname}
+            if param.default is inspect.Parameter.empty:
+                required.append(pname)
+        tools.append({
+            "name": name,
+            "description": info["description"],
+            "input_schema": {
+                "type": "object",
+                "properties": properties,
+                "required": required,
+            },
+        })
+    return tools
+
+
+# ---------------------------------------------------------------------------
+# Message handler with agentic tool-use loop
 # ---------------------------------------------------------------------------
 
 
 async def handle_message(message: str, session_id: str | None = None) -> dict:
-    """Handle an incoming chat message.
-
-    This MAF implementation uses a simple tool-dispatch pattern.
-    Replace with your MAF agent configuration as needed.
-    """
+    """Handle an incoming chat message with LLM-powered tool dispatch."""
     if session_id is None:
         session_id = str(uuid.uuid4())
 
-    # Simple keyword-based tool dispatch
-    results = []
-    message_lower = message.lower()
+    messages = [{"role": "user", "content": message}]
+    tools = _build_tool_definitions()
 
-    for tool_name, tool_info in TOOL_REGISTRY.items():
-        if tool_name.replace("_", " ") in message_lower or any(
-            word in message_lower for word in tool_name.split("_")
-        ):
-            try:
-                result = await tool_info["function"]()
-                results.append(f"**{tool_name}**: {result[:500]}")
-            except TypeError:
-                pass
+    while True:
+        response = await client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4096,
+            system=SYSTEM_PROMPT,
+            tools=tools,
+            messages=messages,
+        )
 
-    if not results:
-        # Default: search entities
-        from app.context_graph_client import search_entities
-        search_results = await search_entities(message)
-        if search_results:
-            response = f"Found {len(search_results)} results:\n"
-            for r in search_results[:5]:
-                name = r.get("n", {}).get("name", "Unknown")
-                response += f"- {name}\n"
+        if response.stop_reason == "tool_use":
+            messages.append({"role": "assistant", "content": response.content})
+
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    tool_info = TOOL_REGISTRY.get(block.name)
+                    if tool_info:
+                        result = await tool_info["function"](**block.input)
+                    else:
+                        result = json.dumps({"error": f"Unknown tool: {block.name}"})
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result if isinstance(result, str) else json.dumps(result, default=str),
+                    })
+
+            messages.append({"role": "user", "content": tool_results})
         else:
-            available = ", ".join(TOOL_REGISTRY.keys())
-            response = (
-                f"I'm your {SYSTEM_PROMPT.split('.')[0].strip()} "
-                f"Available tools: {available}"
-            )
-        return {
-            "response": response,
-            "session_id": session_id,
-            "graph_data": None,
-        }
+            text_parts = [
+                block.text for block in response.content if hasattr(block, "text")
+            ]
+            response_text = "\n".join(text_parts)
+            break
 
     return {
-        "response": "\n\n".join(results),
+        "response": response_text,
         "session_id": session_id,
         "graph_data": None,
     }

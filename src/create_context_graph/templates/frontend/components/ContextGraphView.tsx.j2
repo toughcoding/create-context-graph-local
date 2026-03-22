@@ -1,259 +1,693 @@
 {% raw %}"use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Box, Heading, Text, Flex, Badge, VStack, HStack, IconButton } from "@chakra-ui/react";
-import { InteractiveNvlWrapper } from "@neo4j-nvl/react";
-import type { Node, Relationship } from "@neo4j-nvl/base";
-import { X, ArrowRight, ArrowLeft } from "lucide-react";
-import { NODE_COLORS, NODE_SIZES, DEFAULT_CYPHER, API_BASE } from "@/lib/config";
+import { useEffect, useCallback, useMemo, useState, useRef } from "react";
+import {
+  Box,
+  Text,
+  Flex,
+  Badge,
+  VStack,
+  HStack,
+  Heading,
+  IconButton,
+  Spinner,
+} from "@chakra-ui/react";
+import { X, RotateCcw } from "lucide-react";
+import {
+  NODE_COLORS,
+  NODE_SIZES,
+  SCHEMA_NODE_SIZE,
+  SCHEMA_REL_COLOR,
+  API_BASE,
+} from "@/lib/config";
+import type { GraphData } from "@/lib/config";
 
-interface NvlNode extends Node {
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface GraphNode {
   id: string;
-  captions: { text: string }[];
-  color: string;
-  size: number;
+  labels: string[];
+  properties: Record<string, unknown>;
 }
 
-interface NvlRelationship extends Relationship {
+interface GraphRelationship {
+  id: string;
+  type: string;
+  startNodeId: string;
+  endNodeId: string;
+  properties: Record<string, unknown>;
+}
+
+interface InternalGraphData {
+  nodes: GraphNode[];
+  relationships: GraphRelationship[];
+}
+
+interface NvlNode {
+  id: string;
+  caption?: string;
+  color?: string;
+  size?: number;
+  selected?: boolean;
+}
+
+interface NvlRelationship {
   id: string;
   from: string;
   to: string;
-  captions: { text: string }[];
+  caption?: string;
+  color?: string;
+  selected?: boolean;
 }
 
-interface EntityConnection {
-  name: string;
-  labels: string[];
-  relationship: string;
-  direction: string;
+interface SelectedElement {
+  type: "node" | "relationship";
+  data: GraphNode | GraphRelationship;
 }
 
-export function ContextGraphView() {
-  const [nodes, setNodes] = useState<NvlNode[]>([]);
-  const [rels, setRels] = useState<NvlRelationship[]>([]);
+interface ContextGraphViewProps {
+  externalGraphData?: GraphData | null;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers — convert backend serialized data to internal format
+// ---------------------------------------------------------------------------
+
+function extractNodesAndRels(results: Record<string, unknown>[]): InternalGraphData {
+  const nodeMap = new Map<string, GraphNode>();
+  const relMap = new Map<string, GraphRelationship>();
+
+  function processValue(value: unknown) {
+    if (!value || typeof value !== "object") return;
+
+    if (Array.isArray(value)) {
+      for (const item of value) processValue(item);
+      return;
+    }
+
+    const v = value as Record<string, unknown>;
+
+    // Node: has labels array
+    if (Array.isArray(v.labels) && v.elementId) {
+      const id = String(v.elementId);
+      if (!nodeMap.has(id)) {
+        const { elementId, labels, ...props } = v;
+        nodeMap.set(id, {
+          id,
+          labels: labels as string[],
+          properties: props,
+        });
+      }
+      return;
+    }
+
+    // Relationship: has type and startNodeElementId
+    if (v.type && v.startNodeElementId) {
+      const id = String(v.elementId || v.id || Math.random());
+      if (!relMap.has(id)) {
+        const { elementId, type, startNodeElementId, endNodeElementId, ...props } = v;
+        relMap.set(id, {
+          id,
+          type: String(type),
+          startNodeId: String(startNodeElementId),
+          endNodeId: String(endNodeElementId),
+          properties: props,
+        });
+      }
+      return;
+    }
+
+    // Path: has nodes + relationships arrays
+    if (Array.isArray(v.nodes) && Array.isArray(v.relationships)) {
+      for (const n of v.nodes) processValue(n);
+      for (const r of v.relationships) processValue(r);
+      return;
+    }
+
+    // Recurse into nested objects
+    for (const val of Object.values(v)) {
+      processValue(val);
+    }
+  }
+
+  for (const record of results) {
+    for (const value of Object.values(record)) {
+      processValue(value);
+    }
+  }
+
+  return {
+    nodes: Array.from(nodeMap.values()),
+    relationships: Array.from(relMap.values()),
+  };
+}
+
+function getNodeColor(labels: string[]): string {
+  for (const label of labels) {
+    if (NODE_COLORS[label]) return NODE_COLORS[label];
+  }
+  return "#6366f1";
+}
+
+function getNodeSize(labels: string[]): number {
+  for (const label of labels) {
+    if (NODE_SIZES[label]) return NODE_SIZES[label];
+  }
+  return 20;
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+export function ContextGraphView({ externalGraphData }: ContextGraphViewProps) {
+  const [isSchemaView, setIsSchemaView] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isExpanding, setIsExpanding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<NvlNode | null>(null);
-  const [entityDetail, setEntityDetail] = useState<Record<string, unknown> | null>(null);
-  const [connections, setConnections] = useState<EntityConnection[]>([]);
+  const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedRelId, setSelectedRelId] = useState<string | null>(null);
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
+  const [graphData, setGraphData] = useState<InternalGraphData | null>(null);
 
+  // Load schema on mount
   useEffect(() => {
-    loadGraph();
+    loadSchema();
   }, []);
 
-  async function loadGraph() {
-    try {
-      const res = await fetch(`${API_BASE}/cypher`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: DEFAULT_CYPHER }),
-      });
-      const data = await res.json();
-      transformData(data.results || []);
-    } catch {
-      setError("Unable to load graph data. Is the backend running?");
-    }
-  }
-
-  function getNodeColor(labels: string[]): string {
-    for (const label of labels) {
-      if (NODE_COLORS[label]) return NODE_COLORS[label];
-    }
-    return "#6366f1";
-  }
-
-  function getNodeSize(labels: string[]): number {
-    for (const label of labels) {
-      if (NODE_SIZES[label]) return NODE_SIZES[label];
-    }
-    return 20;
-  }
-
-  function transformData(results: Record<string, unknown>[]) {
-    const nodeMap = new Map<string, NvlNode>();
-    const relList: NvlRelationship[] = [];
-
-    for (const record of results) {
-      for (const [, value] of Object.entries(record)) {
-        if (value && typeof value === "object") {
-          const v = value as Record<string, unknown>;
-          // Detect nodes (have labels array)
-          if (Array.isArray(v.labels)) {
-            const id = String(v.elementId || v.id || v.name || Math.random());
-            if (!nodeMap.has(id)) {
-              nodeMap.set(id, {
-                id,
-                captions: [{ text: String(v.name || v.title || id) }],
-                color: getNodeColor(v.labels as string[]),
-                size: getNodeSize(v.labels as string[]),
-              });
-            }
-          }
-          // Detect relationships (have type and start/end)
-          if (v.type && (v.startNodeElementId || v.start)) {
-            relList.push({
-              id: String(v.elementId || v.id || Math.random()),
-              from: String(v.startNodeElementId || v.start),
-              to: String(v.endNodeElementId || v.end),
-              captions: [{ text: String(v.type) }],
-            });
-          }
-        }
+  // When external graph data arrives from chat, switch to data view
+  useEffect(() => {
+    if (externalGraphData?.results?.length) {
+      const data = extractNodesAndRels(externalGraphData.results);
+      if (data.nodes.length > 0) {
+        setGraphData(data);
+        setIsSchemaView(false);
+        setExpandedNodeIds(new Set());
+        setSelectedElement(null);
+        setSelectedNodeId(null);
+        setSelectedRelId(null);
       }
     }
+  }, [externalGraphData]);
 
-    setNodes(Array.from(nodeMap.values()));
-    setRels(relList);
-  }
-
-  async function loadEntityDetail(name: string) {
+  async function loadSchema() {
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`${API_BASE}/entities/${encodeURIComponent(name)}`);
+      const res = await fetch(`${API_BASE}/schema/visualization`);
       const data = await res.json();
-      setEntityDetail(data.entity || null);
-      setConnections(data.connections || []);
+      if (data.nodes && data.relationships) {
+        // db.schema.visualization() returns serialized Node/Relationship objects
+        const schemaData = extractNodesAndRels([data]);
+        setGraphData(schemaData);
+      } else if (data.labels) {
+        // Fallback: basic schema — create synthetic nodes for labels
+        const nodes: GraphNode[] = data.labels.map((label: string, i: number) => ({
+          id: `schema-${label}`,
+          labels: [label],
+          properties: { name: label, isSchemaNode: true },
+        }));
+        setGraphData({ nodes, relationships: [] });
+      }
+      setIsSchemaView(true);
+      setExpandedNodeIds(new Set());
+      setSelectedElement(null);
     } catch {
-      setEntityDetail(null);
-      setConnections([]);
+      setError("Unable to load schema. Is the backend running?");
+    } finally {
+      setLoading(false);
     }
   }
 
-  const handleNodeClick = useCallback((_: unknown, node: Node) => {
-    const nvlNode = node as NvlNode;
-    setSelectedNode(nvlNode);
-    const name = nvlNode.captions?.[0]?.text;
-    if (name) loadEntityDetail(name);
+  // Double-click: expand node (schema → load label instances, data → expand neighbors)
+  const handleNodeDoubleClick = useCallback(
+    async (node: NvlNode) => {
+      if (!graphData || isExpanding) return;
+
+      if (isSchemaView) {
+        // Schema node: load instances of this label
+        const label = node.caption?.replace(/\s*\(\d+\)$/, "");
+        if (!label) return;
+        setLoading(true);
+        try {
+          const res = await fetch(`${API_BASE}/cypher`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query: `MATCH (n:\`${label}\`)-[r]-(m) RETURN n, r, m LIMIT 50`,
+            }),
+          });
+          const data = await res.json();
+          const parsed = extractNodesAndRels(data.results || []);
+          if (parsed.nodes.length > 0) {
+            setGraphData(parsed);
+            setIsSchemaView(false);
+            setExpandedNodeIds(new Set());
+          }
+        } catch (err) {
+          console.error("Error loading label data:", err);
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Data node: expand neighbors
+      if (expandedNodeIds.has(node.id)) return;
+      setIsExpanding(true);
+
+      try {
+        const res = await fetch(`${API_BASE}/expand`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ element_id: node.id }),
+        });
+        const data = await res.json();
+        const expanded = extractNodesAndRels([data]);
+
+        if (expanded.nodes.length === 0) return;
+
+        // Merge, deduplicating
+        const existingNodeIds = new Set(graphData.nodes.map((n) => n.id));
+        const existingRelIds = new Set(graphData.relationships.map((r) => r.id));
+        const newNodes = expanded.nodes.filter((n) => !existingNodeIds.has(n.id));
+        const newRels = expanded.relationships.filter((r) => !existingRelIds.has(r.id));
+
+        setGraphData({
+          nodes: [...graphData.nodes, ...newNodes],
+          relationships: [...graphData.relationships, ...newRels],
+        });
+        setExpandedNodeIds((prev) => {
+          const next = new Set(prev);
+          next.add(node.id);
+          return next;
+        });
+      } catch (err) {
+        console.error("Error expanding node:", err);
+      } finally {
+        setIsExpanding(false);
+      }
+    },
+    [graphData, isSchemaView, isExpanding, expandedNodeIds],
+  );
+
+  // Click: select node and show properties
+  const handleNodeClick = useCallback(
+    (node: NvlNode) => {
+      if (!graphData) return;
+      const original = graphData.nodes.find((n) => n.id === node.id);
+      if (original) {
+        setSelectedElement({ type: "node", data: original });
+        setSelectedNodeId(node.id);
+        setSelectedRelId(null);
+      }
+    },
+    [graphData],
+  );
+
+  // Click relationship
+  const handleRelationshipClick = useCallback(
+    (rel: NvlRelationship) => {
+      if (!graphData) return;
+      const original = graphData.relationships.find((r) => r.id === rel.id);
+      if (original) {
+        setSelectedElement({ type: "relationship", data: original });
+        setSelectedRelId(rel.id);
+        setSelectedNodeId(null);
+      }
+    },
+    [graphData],
+  );
+
+  // Click canvas: deselect
+  const handleCanvasClick = useCallback(() => {
+    setSelectedElement(null);
+    setSelectedNodeId(null);
+    setSelectedRelId(null);
   }, []);
 
-  function closeDetail() {
-    setEntityDetail(null);
-    setSelectedNode(null);
-    setConnections([]);
+  // Transform to NVL format
+  const nvlData = useMemo(() => {
+    if (!graphData) return { nodes: [], relationships: [] };
+
+    const nodes: NvlNode[] = graphData.nodes.map((node) => {
+      const isSelected = selectedNodeId === node.id;
+      const isExpanded = expandedNodeIds.has(node.id);
+      const isSchema = isSchemaView;
+
+      const caption =
+        (node.properties.name as string) ||
+        (node.properties.title as string) ||
+        node.labels[0] ||
+        node.id.slice(0, 8);
+
+      return {
+        id: node.id,
+        caption,
+        color: isSelected
+          ? "#E53E3E"
+          : isExpanded
+            ? "#38A169"
+            : getNodeColor(node.labels),
+        size: isSchema
+          ? SCHEMA_NODE_SIZE
+          : isSelected
+            ? getNodeSize(node.labels) * 1.3
+            : getNodeSize(node.labels),
+        selected: isSelected,
+      };
+    });
+
+    const relationships: NvlRelationship[] = graphData.relationships.map((rel) => {
+      const isSelected = selectedRelId === rel.id;
+      return {
+        id: rel.id,
+        from: rel.startNodeId,
+        to: rel.endNodeId,
+        caption: rel.type,
+        color: isSelected ? "#E53E3E" : isSchemaView ? SCHEMA_REL_COLOR : "#A0AEC0",
+        selected: isSelected,
+      };
+    });
+
+    return { nodes, relationships };
+  }, [graphData, selectedNodeId, selectedRelId, expandedNodeIds, isSchemaView]);
+
+  // Empty / error states
+  if (error) {
+    return (
+      <Flex h="100%" align="center" justify="center">
+        <Text color="gray.500">{error}</Text>
+      </Flex>
+    );
   }
 
   return (
-    <Flex direction="column" h="100%">
-      <Box px={4} py={3} borderBottom="1px solid" borderColor="gray.200" bg="white">
-        <Heading size="sm">Knowledge Graph</Heading>
+    <Box h="100%" position="relative">
+      {/* Header bar */}
+      <Flex
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        zIndex={10}
+        px={4}
+        py={2}
+        bg="white"
+        borderBottom="1px solid"
+        borderColor="gray.200"
+        justify="space-between"
+        align="center"
+      >
+        <Box>
+          <Heading size="sm">Knowledge Graph</Heading>
+          <Text fontSize="xs" color="gray.500">
+            {isSchemaView
+              ? "Schema view — double-click a label to explore"
+              : "{% endraw %}{{ domain.name }}{% raw %} entity relationships"}
+          </Text>
+        </Box>
+        {!isSchemaView && (
+          <IconButton
+            aria-label="Back to schema"
+            size="xs"
+            variant="ghost"
+            onClick={loadSchema}
+          >
+            <RotateCcw size={14} />
+          </IconButton>
+        )}
+      </Flex>
+
+      {/* Legend */}
+      <Flex
+        position="absolute"
+        top="52px"
+        left={2}
+        zIndex={10}
+        bg="white"
+        borderRadius="md"
+        p={2}
+        gap={2}
+        flexWrap="wrap"
+        maxW="200px"
+        boxShadow="sm"
+        borderWidth="1px"
+        borderColor="gray.200"
+      >
+        {Object.entries(NODE_COLORS)
+          .slice(0, 6)
+          .map(([label, color]) => (
+            <Badge
+              key={label}
+              size="sm"
+              style={{ backgroundColor: color, color: "white" }}
+            >
+              {label}
+            </Badge>
+          ))}
+      </Flex>
+
+      {/* Properties panel */}
+      {selectedElement && (
+        <Box
+          position="absolute"
+          top="52px"
+          right={2}
+          zIndex={10}
+          bg="white"
+          borderRadius="md"
+          p={3}
+          maxW="300px"
+          maxH="calc(100% - 80px)"
+          overflow="auto"
+          boxShadow="md"
+          borderWidth="1px"
+          borderColor="gray.200"
+        >
+          <Flex justify="space-between" align="center" mb={2}>
+            <Heading size="sm">
+              {selectedElement.type === "node" ? "Node" : "Relationship"} Properties
+            </Heading>
+            <IconButton
+              aria-label="Close"
+              size="xs"
+              variant="ghost"
+              onClick={handleCanvasClick}
+            >
+              <X size={14} />
+            </IconButton>
+          </Flex>
+
+          {selectedElement.type === "node" && (
+            <VStack align="stretch" gap={2}>
+              <HStack flexWrap="wrap" gap={1}>
+                <Text fontSize="xs" fontWeight="bold" color="gray.500">
+                  Labels:
+                </Text>
+                {(selectedElement.data as GraphNode).labels.map((label) => (
+                  <Badge
+                    key={label}
+                    size="sm"
+                    style={{
+                      backgroundColor: NODE_COLORS[label] || "#718096",
+                      color: "white",
+                    }}
+                  >
+                    {label}
+                  </Badge>
+                ))}
+              </HStack>
+              <VStack align="stretch" gap={1}>
+                {Object.entries((selectedElement.data as GraphNode).properties)
+                  .filter(([key]) => !key.startsWith("_") && key !== "isSchemaNode" && key !== "embedding")
+                  .map(([key, value]) => (
+                    <Box key={key} bg="gray.50" p={1} borderRadius="sm" fontSize="xs">
+                      <Text fontWeight="medium" color="gray.600">
+                        {key.replace(/_/g, " ")}
+                      </Text>
+                      <Text color="gray.800" wordBreak="break-word" whiteSpace="pre-wrap">
+                        {typeof value === "object"
+                          ? JSON.stringify(value, null, 2)
+                          : String(value ?? "—")}
+                      </Text>
+                    </Box>
+                  ))}
+              </VStack>
+            </VStack>
+          )}
+
+          {selectedElement.type === "relationship" && (
+            <VStack align="stretch" gap={2}>
+              <HStack>
+                <Text fontSize="xs" fontWeight="bold" color="gray.500">
+                  Type:
+                </Text>
+                <Badge size="sm" colorPalette="gray">
+                  {(selectedElement.data as GraphRelationship).type}
+                </Badge>
+              </HStack>
+              {Object.keys((selectedElement.data as GraphRelationship).properties).length > 0 && (
+                <VStack align="stretch" gap={1}>
+                  {Object.entries((selectedElement.data as GraphRelationship).properties).map(
+                    ([key, value]) => (
+                      <Box key={key} bg="gray.50" p={1} borderRadius="sm" fontSize="xs">
+                        <Text fontWeight="medium" color="gray.600">
+                          {key.replace(/_/g, " ")}
+                        </Text>
+                        <Text color="gray.800" wordBreak="break-word">
+                          {typeof value === "object"
+                            ? JSON.stringify(value, null, 2)
+                            : String(value ?? "—")}
+                        </Text>
+                      </Box>
+                    ),
+                  )}
+                </VStack>
+              )}
+            </VStack>
+          )}
+        </Box>
+      )}
+
+      {/* Instructions */}
+      <Box
+        position="absolute"
+        bottom={2}
+        left={2}
+        zIndex={10}
+        bg="white"
+        borderRadius="md"
+        px={2}
+        py={1}
+        boxShadow="sm"
+        borderWidth="1px"
+        borderColor="gray.200"
+        opacity={0.8}
+      >
         <Text fontSize="xs" color="gray.500">
-          {% endraw %}{{ domain.name }}{% raw %} entity relationships
+          Scroll to zoom | Drag to pan | Click to inspect | Double-click to expand
         </Text>
       </Box>
 
-      <Box flex={1} position="relative">
-        {error ? (
-          <Flex align="center" justify="center" h="100%">
-            <Text color="gray.500">{error}</Text>
-          </Flex>
-        ) : nodes.length === 0 ? (
-          <Flex align="center" justify="center" h="100%">
-            <Text color="gray.500">Loading graph...</Text>
-          </Flex>
-        ) : (
-          <InteractiveNvlWrapper
-            nodes={nodes}
-            rels={rels}
-            nvlOptions={{
-              allowDynamicMinZoom: true,
-              layout: "force-directed",
-              relationshipThreshold: 0.55,
-            }}
-            nvlCallbacks={{ onNodeClick: handleNodeClick }}
-            style={{ width: "100%", height: "100%" }}
-          />
-        )}
-
-        {/* Entity detail panel */}
-        {entityDetail && (
-          <Box
-            position="absolute"
-            right={0}
-            top={0}
-            bottom={0}
-            w="320px"
-            bg="white"
-            borderLeft="1px solid"
-            borderColor="gray.200"
-            overflow="auto"
-            p={4}
-            zIndex={10}
-            boxShadow="lg"
-          >
-            <Flex justify="space-between" align="center" mb={3}>
-              <Heading size="sm">
-                {selectedNode?.captions?.[0]?.text}
-              </Heading>
-              <IconButton
-                aria-label="Close"
-                size="xs"
-                variant="ghost"
-                onClick={closeDetail}
-              >
-                <X size={14} />
-              </IconButton>
-            </Flex>
-
-            {/* Labels */}
-            <HStack mb={3} flexWrap="wrap" gap={1}>
-              {((entityDetail._labels as string[]) || []).map((label) => (
-                <Badge key={label} colorPalette="blue" size="sm">
-                  {label}
-                </Badge>
-              ))}
-            </HStack>
-
-            {/* Properties */}
-            <VStack align="stretch" gap={2} mb={4}>
-              {Object.entries(entityDetail)
-                .filter(([k]) => k !== "_labels" && k !== "name")
-                .map(([key, value]) => (
-                  <Box key={key}>
-                    <Text fontSize="xs" color="gray.500" fontWeight="medium">
-                      {key.replace(/_/g, " ")}
-                    </Text>
-                    <Text fontSize="sm">{String(value ?? "—")}</Text>
-                  </Box>
-                ))}
-            </VStack>
-
-            {/* Connections */}
-            {connections.length > 0 && (
-              <>
-                <Heading size="xs" mb={2}>
-                  Connections ({connections.length})
-                </Heading>
-                <VStack align="stretch" gap={1}>
-                  {connections.map((conn, i) => (
-                    <HStack key={i} fontSize="xs" gap={1}>
-                      {conn.direction === "outgoing" ? (
-                        <ArrowRight size={10} />
-                      ) : (
-                        <ArrowLeft size={10} />
-                      )}
-                      <Badge size="sm" variant="outline" flexShrink={0}>
-                        {conn.relationship}
-                      </Badge>
-                      <Text truncate>{conn.name}</Text>
-                    </HStack>
-                  ))}
-                </VStack>
-              </>
-            )}
-          </Box>
-        )}
-      </Box>
-
-      {/* Color legend */}
-      <Box px={4} py={2} borderTop="1px solid" borderColor="gray.200" bg="white">
-        <Flex gap={3} flexWrap="wrap">
-          {Object.entries(NODE_COLORS).map(([label, color]) => (
-            <Flex key={label} align="center" gap={1}>
-              <Box w={3} h={3} borderRadius="full" bg={color} />
-              <Text fontSize="xs">{label}</Text>
-            </Flex>
-          ))}
+      {/* Loading overlay */}
+      {(loading || isExpanding) && (
+        <Flex
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translate(-50%, -50%)"
+          zIndex={20}
+          bg="white"
+          borderRadius="md"
+          p={3}
+          boxShadow="md"
+          borderWidth="1px"
+          borderColor="gray.200"
+          align="center"
+          gap={2}
+        >
+          <Spinner size="sm" />
+          <Text fontSize="sm">{isExpanding ? "Expanding node..." : "Loading..."}</Text>
         </Flex>
+      )}
+
+      {/* Graph */}
+      <Box h="100%" w="100%" pt="48px">
+        {nvlData.nodes.length > 0 ? (
+          <NvlGraph
+            nodes={nvlData.nodes}
+            relationships={nvlData.relationships}
+            onNodeClick={handleNodeClick}
+            onNodeDoubleClick={handleNodeDoubleClick}
+            onRelationshipClick={handleRelationshipClick}
+            onCanvasClick={handleCanvasClick}
+          />
+        ) : (
+          <Flex h="100%" align="center" justify="center" direction="column" gap={2}>
+            <Text color="gray.500">No graph data to display.</Text>
+            <Text color="gray.400" fontSize="sm">
+              Use the AI assistant to query data or double-click a schema label.
+            </Text>
+          </Flex>
+        )}
       </Box>
-    </Flex>
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NvlGraph — handles dynamic NVL import (avoids SSR issues)
+// ---------------------------------------------------------------------------
+
+function NvlGraph({
+  nodes,
+  relationships,
+  onNodeClick,
+  onNodeDoubleClick,
+  onRelationshipClick,
+  onCanvasClick,
+}: {
+  nodes: NvlNode[];
+  relationships: NvlRelationship[];
+  onNodeClick: (node: NvlNode) => void;
+  onNodeDoubleClick: (node: NvlNode) => void;
+  onRelationshipClick: (rel: NvlRelationship) => void;
+  onCanvasClick: () => void;
+}) {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const [NvlComponent, setNvlComponent] = useState<React.ComponentType<any> | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const nvlRef = useRef<any>(null);
+
+  useEffect(() => {
+    import("@neo4j-nvl/react").then((mod) => {
+      setNvlComponent(() => mod.InteractiveNvlWrapper);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (NvlComponent && nodes.length > 0) {
+      const timer = setTimeout(() => setIsReady(true), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [NvlComponent, nodes.length]);
+
+  if (!NvlComponent) {
+    return (
+      <Flex h="100%" align="center" justify="center">
+        <Text color="gray.500">Loading graph visualization...</Text>
+      </Flex>
+    );
+  }
+
+  return (
+    <NvlComponent
+      ref={nvlRef}
+      nodes={nodes}
+      rels={relationships}
+      nvlOptions={{
+        layout: "d3Force",
+        initialZoom: 1,
+        minZoom: 0.1,
+        maxZoom: 5,
+        relationshipThickness: 2,
+        disableTelemetry: true,
+      }}
+      mouseEventCallbacks={{
+        onNodeClick: (node: NvlNode) => onNodeClick(node),
+        onNodeDoubleClick: (node: NvlNode) => onNodeDoubleClick(node),
+        onRelationshipClick: (rel: NvlRelationship) => onRelationshipClick(rel),
+        onCanvasClick: () => onCanvasClick(),
+        onZoom: isReady,
+        onPan: isReady,
+        onDrag: isReady,
+      }}
+      style={{ width: "100%", height: "100%" }}
+    />
   );
 }
 {% endraw %}

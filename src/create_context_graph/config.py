@@ -52,7 +52,7 @@ FRAMEWORK_DEPENDENCIES = {
     "openai-agents": ["openai-agents>=0.1"],
     "langgraph": ["langgraph>=0.1", "langchain-anthropic>=0.3"],
     "crewai": ["crewai>=0.1"],
-    "maf": [],
+    "maf": ["anthropic>=0.30"],
 }
 
 

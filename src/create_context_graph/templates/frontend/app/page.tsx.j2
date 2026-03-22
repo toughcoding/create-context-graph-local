@@ -1,5 +1,6 @@
 {% raw %}"use client";
 
+import { useState, useCallback } from "react";
 import { Box, Flex, Heading, Text, Tabs } from "@chakra-ui/react";
 import dynamic from "next/dynamic";
 import { ChatInterface } from "@/components/ChatInterface";
@@ -10,8 +11,15 @@ const ContextGraphView = dynamic(
 import { DecisionTracePanel } from "@/components/DecisionTracePanel";
 import { DocumentBrowser } from "@/components/DocumentBrowser";
 import { DOMAIN } from "@/lib/config";
+import type { GraphData } from "@/lib/config";
 
 export default function Home() {
+  const [graphData, setGraphData] = useState<GraphData | null>(null);
+
+  const handleGraphUpdate = useCallback((data: GraphData) => {
+    setGraphData(data);
+  }, []);
+
   return (
     <Flex direction="column" h="100vh">
       {/* Header */}
@@ -28,12 +36,12 @@ export default function Home() {
       <Flex flex={1} overflow="hidden">
         {/* Left panel: Chat */}
         <Box w="400px" borderRight="1px solid" borderColor="gray.200" overflow="auto">
-          <ChatInterface />
+          <ChatInterface onGraphUpdate={handleGraphUpdate} />
         </Box>
 
         {/* Center panel: Graph visualization */}
         <Box flex={1} bg="gray.50">
-          <ContextGraphView />
+          <ContextGraphView externalGraphData={graphData} />
         </Box>
 
         {/* Right panel: Decision traces + Documents */}

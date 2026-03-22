@@ -3,9 +3,64 @@
 from __future__ import annotations
 
 from neo4j import AsyncGraphDatabase, AsyncDriver
+from neo4j.graph import Node, Relationship, Path
 
 
 _driver: AsyncDriver | None = None
+
+
+# ---------------------------------------------------------------------------
+# Result collector — captures Cypher results from agent tool calls so the
+# chat endpoint can attach them as graph_data without modifying agent templates.
+# ---------------------------------------------------------------------------
+
+class CypherResultCollector:
+    """Collects Cypher query results for downstream graph visualization."""
+
+    def __init__(self):
+        self.results: list[dict] = []
+
+    def collect(self, records: list[dict]) -> None:
+        self.results.extend(records)
+
+    def drain(self) -> list[dict]:
+        results = list(self.results)
+        self.results.clear()
+        return results
+
+
+_collector = CypherResultCollector()
+
+
+def get_collector() -> CypherResultCollector:
+    """Get the global result collector."""
+    return _collector
+
+
+def _serialize(value):
+    """Serialize Neo4j graph types to JSON-friendly dicts."""
+    if isinstance(value, Node):
+        props = dict(value)
+        props["elementId"] = value.element_id
+        props["labels"] = list(value.labels)
+        return props
+    if isinstance(value, Relationship):
+        props = dict(value)
+        props["elementId"] = value.element_id
+        props["type"] = value.type
+        props["startNodeElementId"] = value.start_node.element_id
+        props["endNodeElementId"] = value.end_node.element_id
+        return props
+    if isinstance(value, Path):
+        return {
+            "nodes": [_serialize(n) for n in value.nodes],
+            "relationships": [_serialize(r) for r in value.relationships],
+        }
+    if isinstance(value, list):
+        return [_serialize(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _serialize(v) for k, v in value.items()}
+    return value
 
 
 async def connect_neo4j() -> None:
@@ -34,12 +89,16 @@ def get_driver() -> AsyncDriver:
     return _driver
 
 
-async def execute_cypher(query: str, parameters: dict | None = None) -> list[dict]:
-    """Execute a Cypher query and return results as dicts."""
+async def execute_cypher(query: str, parameters: dict | None = None, *, collect: bool = True) -> list[dict]:
+    """Execute a Cypher query and return results as dicts with graph metadata."""
     driver = get_driver()
     async with driver.session() as session:
         result = await session.run(query, parameters or {})
-        records = await result.data()
+        records = []
+        async for record in result:
+            records.append({k: _serialize(v) for k, v in record.items()})
+        if collect:
+            _collector.collect(records)
         return records
 
 
@@ -82,7 +141,40 @@ async def get_schema() -> dict:
     }
 
 
+async def get_schema_visualization() -> dict:
+    """Get the graph schema as nodes and relationships for visualization.
+
+    Uses db.schema.visualization() which returns label nodes and
+    relationship-type edges between them.
+    """
+    try:
+        results = await execute_cypher(
+            "CALL db.schema.visualization() YIELD nodes, relationships RETURN nodes, relationships",
+            collect=False,
+        )
+        if results:
+            return results[0]
+    except Exception:
+        pass
+    # Fallback: return basic label/rel lists
+    return await get_schema()
+
+
+async def expand_node(element_id: str) -> dict:
+    """Get immediate neighbors of a node for graph expansion."""
+    cypher = """
+    MATCH (n) WHERE elementId(n) = $elementId
+    OPTIONAL MATCH (n)-[r]-(m)
+    RETURN collect(DISTINCT n) + collect(DISTINCT m) AS nodes,
+           collect(DISTINCT r) AS relationships
+    """
+    results = await execute_cypher(cypher, {"elementId": element_id}, collect=False)
+    if results:
+        return results[0]
+    return {"nodes": [], "relationships": []}
+
+
 async def reset_database() -> None:
     """Drop all data and recreate schema."""
-    await execute_cypher("MATCH (n) DETACH DELETE n")
+    await execute_cypher("MATCH (n) DETACH DELETE n", collect=False)
 {% endraw %}
