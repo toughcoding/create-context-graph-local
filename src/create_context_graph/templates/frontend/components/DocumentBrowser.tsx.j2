@@ -179,13 +179,22 @@ export function DocumentBrowser() {
           align="stretch"
         >
           {documents.length === 0 ? (
-            <Box py={8}>
+            <Box py={8} px={4}>
+              <Flex justify="center" mb={3}>
+                <FileText size={32} color="#A0AEC0" />
+              </Flex>
               <Text fontSize="sm" color="gray.500" textAlign="center">
-                No documents loaded.
+                No documents loaded
               </Text>
-              <Text fontSize="xs" color="gray.400" textAlign="center" mt={1}>
-                Run <code>make seed</code> to load domain documents.
+              <Text fontSize="xs" color="gray.400" textAlign="center" mt={2} lineHeight="tall">
+                Documents are domain-specific knowledge artifacts (reports, notes, assessments)
+                that the AI agent can reference when answering questions.
               </Text>
+              <Box mt={3} textAlign="center">
+                <Badge variant="outline" fontSize="xs" fontFamily="mono" px={2}>
+                  make seed
+                </Badge>
+              </Box>
             </Box>
           ) : (
             documents.map((doc) => (

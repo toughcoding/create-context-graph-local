@@ -436,12 +436,13 @@ export function ContextGraphView({ externalGraphData }: ContextGraphViewProps) {
         gap={2}
         flexWrap="wrap"
         maxW="200px"
+        maxH="240px"
+        overflowY="auto"
         boxShadow="sm"
         borderWidth="1px"
         borderColor="gray.200"
       >
         {Object.entries(NODE_COLORS)
-          .slice(0, 6)
           .map(([label, color]) => (
             <Badge
               key={label}

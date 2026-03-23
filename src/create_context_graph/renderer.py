@@ -155,6 +155,23 @@ class ProjectRenderer:
                 ctx,
             )
 
+        # Deployment templates (always generated)
+        self._render_template(
+            "base/Dockerfile.backend.j2",
+            output_dir / "Dockerfile.backend",
+            ctx,
+        )
+        self._render_template(
+            "base/Dockerfile.frontend.j2",
+            output_dir / "Dockerfile.frontend",
+            ctx,
+        )
+        self._render_template(
+            "base/docker-compose.prod.yml.j2",
+            output_dir / "docker-compose.prod.yml",
+            ctx,
+        )
+
     def _render_backend(self, backend_dir: Path, ctx: dict) -> None:
         """Render the FastAPI backend."""
         shared_templates = {
@@ -256,9 +273,12 @@ class ProjectRenderer:
             "frontend/components/ContextGraphView.tsx.j2": "components/ContextGraphView.tsx",
             "frontend/components/DecisionTracePanel.tsx.j2": "components/DecisionTracePanel.tsx",
             "frontend/components/DocumentBrowser.tsx.j2": "components/DocumentBrowser.tsx",
+            "frontend/components/ErrorBoundary.tsx.j2": "components/ErrorBoundary.tsx",
             "frontend/components/Provider.tsx.j2": "components/Provider.tsx",
             "frontend/lib/config.ts.j2": "lib/config.ts",
             "frontend/theme/index.ts.j2": "theme/index.ts",
+            "frontend/playwright.config.ts.j2": "playwright.config.ts",
+            "frontend/e2e/app.spec.ts.j2": "e2e/app.spec.ts",
         }
         for template_name, output_name in templates.items():
             self._render_template(template_name, frontend_dir / output_name, ctx)

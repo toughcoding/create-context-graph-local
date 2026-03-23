@@ -64,14 +64,22 @@ export function DecisionTracePanel() {
 
       <VStack flex={1} overflow="auto" px={4} py={2} gap={2} align="stretch">
         {traces.length === 0 ? (
-          <Box py={8}>
+          <Box py={8} px={4}>
+            <Flex justify="center" mb={3}>
+              <GitBranch size={32} color="#A0AEC0" />
+            </Flex>
             <Text fontSize="sm" color="gray.500" textAlign="center">
-              No decision traces yet.
+              No decision traces yet
             </Text>
-            <Text fontSize="xs" color="gray.400" textAlign="center" mt={1}>
-              Decision traces appear here after seeding data with{" "}
-              <code>make seed</code>.
+            <Text fontSize="xs" color="gray.400" textAlign="center" mt={2} lineHeight="tall">
+              Decision traces capture multi-step reasoning chains — the thoughts,
+              actions, and observations an agent uses to reach a conclusion.
             </Text>
+            <Box mt={3} textAlign="center">
+              <Badge variant="outline" fontSize="xs" fontFamily="mono" px={2}>
+                make seed
+              </Badge>
+            </Box>
           </Box>
         ) : (
           traces.map((trace) => (

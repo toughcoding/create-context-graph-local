@@ -35,7 +35,8 @@ SYSTEM_PROMPT = """{{ system_prompt }}"""
 client = anthropic.AsyncAnthropic()
 
 # ---------------------------------------------------------------------------
-# Modular tool registry for {{ endraw }}{{ domain.name }}{% raw %}
+{% endraw %}# Modular tool registry for {{ domain.name }}
+{% raw %}
 # ---------------------------------------------------------------------------
 
 TOOL_REGISTRY = {}

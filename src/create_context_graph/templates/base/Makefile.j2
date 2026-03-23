@@ -4,7 +4,7 @@
 -include .env
 export
 
-.PHONY: start dev dev-backend dev-frontend install seed reset clean test lint
+.PHONY: start dev dev-backend dev-frontend install seed reset clean test test-e2e lint docker-build docker-prod-up docker-prod-down
 
 # Start both backend and frontend
 start:
@@ -78,10 +78,24 @@ test:
 	cd backend && uv run python -m pytest tests/ -v 2>/dev/null || echo "No backend tests found"
 	cd frontend && npm test 2>/dev/null || echo "No frontend tests found"
 
+# End-to-end tests (requires backend + frontend running, and Playwright installed)
+test-e2e:
+	cd frontend && npx playwright install --with-deps chromium 2>/dev/null; npm run test:e2e
+
 # Lint
 lint:
 	cd backend && uv run ruff check app/ 2>/dev/null || echo "Install ruff for linting: uv pip install ruff"
 	cd frontend && npm run lint 2>/dev/null || echo "No frontend lint configured"
+
+# Docker production deployment
+docker-build:
+	docker compose -f docker-compose.prod.yml build
+
+docker-prod-up:
+	docker compose -f docker-compose.prod.yml up -d
+
+docker-prod-down:
+	docker compose -f docker-compose.prod.yml down
 
 # Clean build artifacts
 clean:

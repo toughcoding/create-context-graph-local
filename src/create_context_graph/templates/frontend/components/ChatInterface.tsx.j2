@@ -29,11 +29,31 @@ interface ChatInterfaceProps {
   onGraphUpdate?: (data: GraphData) => void;
 }
 
+const STORAGE_KEY = "ccg-chat-history";
+const SESSION_KEY = "ccg-session-id";
+
+function loadStoredMessages(): Message[] {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadStoredSessionId(): string | null {
+  try {
+    return sessionStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function ChatInterface({ onGraphUpdate }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(loadStoredMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(loadStoredSessionId);
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingToolCalls, setStreamingToolCalls] = useState<ToolCall[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -44,6 +64,14 @@ export function ChatInterface({ onGraphUpdate }: ChatInterfaceProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent, streamingToolCalls]);
+
+  // Persist chat history to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      if (sessionId) sessionStorage.setItem(SESSION_KEY, sessionId);
+    } catch { /* storage full or unavailable */ }
+  }, [messages, sessionId]);
 
   // Throttle streaming text updates to ~50ms to avoid excessive ReactMarkdown re-renders
   const flushTextBuffer = useCallback(() => {
@@ -70,6 +98,10 @@ export function ChatInterface({ onGraphUpdate }: ChatInterfaceProps) {
     setStreamingContent("");
     setStreamingToolCalls([]);
     setLoading(false);
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch { /* ignore */ }
   }
 
   async function sendMessage(text?: string) {
@@ -274,9 +306,10 @@ export function ChatInterface({ onGraphUpdate }: ChatInterfaceProps) {
                       cursor="pointer"
                       variant="outline"
                       fontSize="xs"
+                      title={prompt}
                       onClick={() => sendMessage(prompt)}
                     >
-                      {prompt.slice(0, 40)}...
+                      {prompt.length > 60 ? prompt.slice(0, 60) + "..." : prompt}
                     </Badge>
                   ))}
                 </Flex>
