@@ -18,10 +18,15 @@ dev: start
 
 # Backend
 dev-backend:
+{% if framework in ['crewai', 'strands', 'google-adk'] %}
+	cd backend && uv run uvicorn app.main:app --reload --port $${BACKEND_PORT:-8000} --loop asyncio
+{% else %}
 	cd backend && uv run uvicorn app.main:app --reload --port $${BACKEND_PORT:-8000}
+{% endif %}
 
 install-backend:
 	cd backend && uv sync
+	cd backend && uv run python -m spacy download en_core_web_sm
 
 # Frontend
 dev-frontend:

@@ -50,6 +50,7 @@ console = Console()
 @click.option("--neo4j-aura-env", type=click.Path(exists=True), help="Path to Neo4j Aura .env file with credentials")
 @click.option("--neo4j-local", is_flag=True, help="Use @johnymontana/neo4j-local for local Neo4j (no Docker)")
 @click.option("--anthropic-api-key", envvar="ANTHROPIC_API_KEY", help="Anthropic API key for LLM generation")
+@click.option("--openai-api-key", envvar="OPENAI_API_KEY", help="OpenAI API key for LLM generation")
 @click.option("--custom-domain", type=str, help="Natural language description for custom domain generation (requires --anthropic-api-key)")
 @click.option("--connector", multiple=True, help="SaaS connector to enable (github, slack, jira, notion, gmail, gcal, salesforce)")
 @click.option("--output-dir", type=click.Path(), help="Output directory (default: ./<project-name>)")
@@ -69,6 +70,7 @@ def main(
     neo4j_aura_env: str | None,
     neo4j_local: bool,
     anthropic_api_key: str | None,
+    openai_api_key: str | None,
     custom_domain: str | None,
     connector: tuple[str, ...],
     output_dir: str | None,
@@ -155,6 +157,7 @@ def main(
             neo4j_password=neo4j_password,
             neo4j_type=neo4j_type_resolved,
             anthropic_api_key=anthropic_api_key,
+            openai_api_key=openai_api_key,
             generate_data=demo_data,
             custom_domain_yaml=custom_domain_yaml,
             saas_connectors=list(connector),

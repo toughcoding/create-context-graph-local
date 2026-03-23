@@ -181,10 +181,11 @@ def scaffold_project(domain: str, framework: str, output_dir: Path) -> bool:
     log(f"Scaffolding {domain} + {framework} → {output_dir}")
     cmd = [
         sys.executable, "-m", "create_context_graph",
-        str(output_dir / "test-app"),
+        "test-app",
         "--domain", domain,
         "--framework", framework,
         "--demo-data",
+        "--output-dir", str(output_dir / "test-app"),
         "--neo4j-uri", os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
         "--neo4j-username", os.environ.get("NEO4J_USERNAME", "neo4j"),
         "--neo4j-password", os.environ.get("NEO4J_PASSWORD", "password"),
@@ -197,6 +198,7 @@ def scaffold_project(domain: str, framework: str, output_dir: Path) -> bool:
     openai_key = os.environ.get("OPENAI_API_KEY", "")
     if openai_key:
         cmd.extend(["--openai-api-key", openai_key])
+
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
@@ -238,13 +240,18 @@ def install_and_seed(project_dir: Path) -> bool:
     return True
 
 
-def start_backend(project_dir: Path) -> subprocess.Popen | None:
+def start_backend(project_dir: Path, framework: str = "") -> subprocess.Popen | None:
     """Start the FastAPI backend server."""
     backend_dir = project_dir / "backend"
     log(f"Starting backend on port {BACKEND_PORT}...")
 
+    cmd = ["uv", "run", "uvicorn", "app.main:app", "--port", str(BACKEND_PORT)]
+    # Frameworks using nest_asyncio are incompatible with uvloop
+    if framework in ("crewai", "strands", "google-adk"):
+        cmd.extend(["--loop", "asyncio"])
+
     proc = subprocess.Popen(
-        ["uv", "run", "uvicorn", "app.main:app", "--port", str(BACKEND_PORT)],
+        cmd,
         cwd=backend_dir,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -400,7 +407,7 @@ def test_domain(
         summary.seed_ok = True
 
         # Start backend
-        backend_proc = start_backend(project_dir)
+        backend_proc = start_backend(project_dir, framework)
         if not backend_proc:
             return summary
         summary.backend_started = True

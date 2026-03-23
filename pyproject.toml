@@ -39,7 +39,7 @@ generate = [
     "openai>=1.0",
 ]
 ingest = [
-    "neo4j-agent-memory>=0.0.5",
+    "neo4j-agent-memory[spacy,gliner]>=0.0.5",
 ]
 connectors = [
     "PyGithub>=2.0",
