@@ -81,6 +81,11 @@ def _serialize(value):
     return value
 
 
+def is_connected() -> bool:
+    """Check if the Neo4j driver is connected."""
+    return _driver is not None
+
+
 async def connect_neo4j() -> None:
     """Connect to Neo4j and optionally initialize the memory client."""
     global _driver, _memory_client
@@ -182,11 +187,12 @@ async def execute_cypher(
     *,
     collect: bool = True,
     tool_name: str | None = None,
+    timeout: float | None = 30.0,
 ) -> list[dict]:
     """Execute a Cypher query and return results as dicts with graph metadata."""
     driver = get_driver()
     async with driver.session() as session:
-        result = await session.run(query, parameters or {})
+        result = await session.run(query, parameters or {}, timeout=timeout)
         records = []
         async for record in result:
             records.append({k: _serialize(v) for k, v in record.items()})

@@ -25,7 +25,7 @@ entity_types:
         type: date
       - name: blood_type
         type: string
-        enum: [A+, A-, B+, B-, AB+, AB-, O+, O-]
+        enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
       - name: allergies
         type: string
 

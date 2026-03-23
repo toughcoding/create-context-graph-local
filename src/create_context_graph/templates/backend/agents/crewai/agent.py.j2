@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import uuid
 
+import asyncio
+
 import nest_asyncio
 nest_asyncio.apply()
 
@@ -18,6 +20,16 @@ from app.context_graph_client import (
 )
 
 
+def _run_sync(coro):
+    """Run an async coroutine synchronously, compatible with nest_asyncio."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
+
+
 SYSTEM_PROMPT = """{{ system_prompt }}"""
 
 # ---------------------------------------------------------------------------
@@ -28,14 +40,13 @@ SYSTEM_PROMPT = """{{ system_prompt }}"""
 @tool
 def {{ tool.name }}({% for param in tool.parameters %}{{ param.name }}: {{ 'str' if param.type == 'string' else 'int' if param.type == 'integer' else 'float' if param.type == 'float' else 'str' }}{% if param.default is not none %} = {{ param.default if param.type != 'string' else '"' + param.default + '"' }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}) -> str:
     """{{ tool.description }}"""
-    import asyncio
     cypher = """{{ tool.cypher | indent(4) }}"""
     params = {
 {% for param in tool.parameters %}
         "{{ param.name }}": {{ param.name }},
 {% endfor %}
     }
-    result = asyncio.run(execute_cypher(cypher, params, tool_name="{{ tool.name }}"))
+    result = _run_sync(execute_cypher(cypher, params, tool_name="{{ tool.name }}"))
     return json.dumps(result, default=str)
 
 {% endfor %}
@@ -44,17 +55,18 @@ def {{ tool.name }}({% for param in tool.parameters %}{{ param.name }}: {{ 'str'
 @tool
 def run_cypher(query: str, parameters: str = "{}") -> str:
     """Execute a read-only Cypher query against the knowledge graph."""
-    import asyncio
-    params = json.loads(parameters) if parameters else {}
-    result = asyncio.run(execute_cypher(query, params, tool_name="run_cypher"))
+    try:
+        params = json.loads(parameters) if parameters else {}
+    except json.JSONDecodeError:
+        return json.dumps({"error": "Invalid JSON parameters"})
+    result = _run_sync(execute_cypher(query, params, tool_name="run_cypher"))
     return json.dumps(result, default=str)
 
 
 @tool
 def get_graph_schema() -> str:
     """Get the knowledge graph schema (node labels and relationship types)."""
-    import asyncio
-    result = asyncio.run(get_schema())
+    result = _run_sync(get_schema())
     return json.dumps(result, default=str)
 {% endraw %}
 
@@ -107,7 +119,7 @@ async def handle_message(message: str, session_id: str | None = None) -> dict:
     )
 
     crew = Crew(agents=[agent], tasks=[task], verbose=False)
-    result = crew.kickoff()
+    result = await asyncio.to_thread(crew.kickoff)
 
     response_text = str(result)
     await store_message(session_id, "assistant", response_text)

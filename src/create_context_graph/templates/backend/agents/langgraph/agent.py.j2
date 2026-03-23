@@ -41,7 +41,10 @@ async def {{ tool.name }}({% for param in tool.parameters %}{{ param.name }}: {{
 @tool
 async def run_cypher(query: str, parameters: str = "{}") -> str:
     """Execute a read-only Cypher query against the knowledge graph."""
-    params = json.loads(parameters) if parameters else {}
+    try:
+        params = json.loads(parameters) if parameters else {}
+    except json.JSONDecodeError:
+        return json.dumps({"error": "Invalid JSON parameters"})
     result = await execute_cypher(query, params, tool_name="run_cypher")
     return json.dumps(result, default=str)
 

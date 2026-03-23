@@ -33,19 +33,19 @@ export default function Home() {
       </Box>
 
       {/* Main content - 3 panel layout */}
-      <Flex flex={1} overflow="hidden">
+      <Flex as="main" flex={1} overflow="hidden">
         {/* Left panel: Chat */}
-        <Box w="400px" borderRight="1px solid" borderColor="gray.200" overflow="auto">
+        <Box as="section" aria-label="Chat" w="400px" borderRight="1px solid" borderColor="gray.200" overflow="auto">
           <ChatInterface onGraphUpdate={handleGraphUpdate} />
         </Box>
 
         {/* Center panel: Graph visualization */}
-        <Box flex={1} bg="gray.50">
+        <Box as="section" aria-label="Graph visualization" flex={1} bg="gray.50">
           <ContextGraphView externalGraphData={graphData} />
         </Box>
 
         {/* Right panel: Decision traces + Documents */}
-        <Box w="350px" borderLeft="1px solid" borderColor="gray.200" overflow="hidden">
+        <Box as="aside" aria-label="Details" w="350px" borderLeft="1px solid" borderColor="gray.200" overflow="hidden">
           <Tabs.Root defaultValue="traces" size="sm">
             <Tabs.List borderBottom="1px solid" borderColor="gray.200">
               <Tabs.Trigger value="traces">Traces</Tabs.Trigger>

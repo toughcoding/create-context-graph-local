@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.agent import handle_message
 from app.context_graph_client import (
     execute_cypher, search_entities, get_entity_graph, get_schema,
-    get_schema_visualization, expand_node, get_collector,
+    get_schema_visualization, expand_node, get_collector, is_connected,
 )
 from app.gds_client import check_gds_available, run_community_detection, run_pagerank
 
@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., max_length=4000)
     session_id: str | None = None
 
 
@@ -28,7 +28,7 @@ class ChatResponse(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    query: str
+    query: str = Field(..., max_length=2000)
     label: str | None = None
     limit: int = 20
 
@@ -45,6 +45,11 @@ class ExpandRequest(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Send a message to the AI agent."""
+    if not is_connected():
+        raise HTTPException(
+            status_code=503,
+            detail="Neo4j is unavailable. Check your database connection and restart the server.",
+        )
     try:
         collector = get_collector()
         collector.drain()  # clear stale results

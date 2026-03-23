@@ -27,9 +27,10 @@ my-app/
 │   │   ├── routes.py                 # API endpoints (/chat, /graph, /health)
 │   │   ├── models.py                 # Pydantic models generated from ontology
 │   │   ├── agent.py                  # AI agent (framework-specific)
-│   │   ├── context_graph_client.py   # Neo4j read/write client
-│   │   ├── gds_client.py            # Neo4j Graph Data Science client
-│   │   └── vector_client.py         # Vector search client
+│   │   ├── constants.py              # Shared constants (index names, graph projections)
+│   │   ├── context_graph_client.py   # Neo4j read/write client with query timeouts
+│   │   ├── gds_client.py            # Neo4j Graph Data Science client (label-validated)
+│   │   └── vector_client.py         # Vector search client with logging
 │   ├── tests/
 │   │   ├── __init__.py
 │   │   └── test_routes.py            # Generated test scaffold (health, scenarios)

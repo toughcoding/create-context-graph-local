@@ -60,6 +60,7 @@ class TestGeneratedPythonFiles:
         "backend/app/agent.py",
         "backend/app/routes.py",
         "backend/app/models.py",
+        "backend/app/constants.py",
         "backend/app/context_graph_client.py",
         "backend/app/gds_client.py",
         "backend/app/vector_client.py",
@@ -514,3 +515,136 @@ class TestGeneratedDataFiles:
     def test_documents_dir_exists(self, generated_project):
         out, _ = generated_project
         assert (out / "data" / "documents").is_dir()
+
+
+class TestV040Features:
+    """Tests for v0.4.0 improvements."""
+
+    def test_constants_py_generated(self, generated_project):
+        out, _ = generated_project
+        constants = out / "backend" / "app" / "constants.py"
+        assert constants.exists()
+        content = constants.read_text()
+        assert "DEFAULT_VECTOR_INDEX" in content
+        assert "COMMUNITY_GRAPH" in content
+        assert "PAGERANK_GRAPH" in content
+
+    def test_health_endpoint_in_main(self, generated_project):
+        out, _ = generated_project
+        main = (out / "backend" / "app" / "main.py").read_text()
+        assert "get_neo4j_status" in main or "_neo4j_available" in main
+        assert "/health" in main
+        assert "degraded" in main
+
+    def test_graceful_neo4j_degradation(self, generated_project):
+        out, _ = generated_project
+        main = (out / "backend" / "app" / "main.py").read_text()
+        assert "Neo4j unavailable" in main or "degraded mode" in main
+
+    def test_is_connected_helper(self, generated_project):
+        out, _ = generated_project
+        client = (out / "backend" / "app" / "context_graph_client.py").read_text()
+        assert "def is_connected()" in client
+
+    def test_query_timeout(self, generated_project):
+        out, _ = generated_project
+        client = (out / "backend" / "app" / "context_graph_client.py").read_text()
+        assert "timeout" in client
+
+    def test_gds_label_validation(self, generated_project):
+        out, _ = generated_project
+        gds = (out / "backend" / "app" / "gds_client.py").read_text()
+        assert "ENTITY_LABELS" in gds
+        assert "Invalid label" in gds
+
+    def test_routes_input_validation(self, generated_project):
+        out, _ = generated_project
+        routes = (out / "backend" / "app" / "routes.py").read_text()
+        assert "max_length" in routes
+        assert "Field(" in routes
+
+    def test_routes_neo4j_check_on_chat(self, generated_project):
+        out, _ = generated_project
+        routes = (out / "backend" / "app" / "routes.py").read_text()
+        assert "is_connected()" in routes
+        assert "503" in routes
+
+    def test_cors_configurable(self, generated_project):
+        out, _ = generated_project
+        main = (out / "backend" / "app" / "main.py").read_text()
+        assert "CORS_ORIGINS" in main
+
+    def test_env_example_has_warnings(self, generated_project):
+        out, _ = generated_project
+        env_example = (out / ".env.example").read_text()
+        assert "WARNING" in env_example or "Change" in env_example
+
+    def test_json_error_handling_in_agent(self, generated_project):
+        out, _ = generated_project
+        agent = (out / "backend" / "app" / "agent.py").read_text()
+        assert "JSONDecodeError" in agent or "json.JSONDecodeError" in agent
+
+    def test_vector_client_has_logging(self, generated_project):
+        out, _ = generated_project
+        vc = (out / "backend" / "app" / "vector_client.py").read_text()
+        assert "logger" in vc
+
+    def test_frontend_semantic_html(self, generated_project):
+        """Frontend uses semantic HTML landmarks."""
+        out, _ = generated_project
+        page = (out / "frontend" / "app" / "page.tsx").read_text()
+        assert 'as="main"' in page or 'as="section"' in page
+        assert 'aria-label' in page
+
+    def test_document_browser_has_pagination(self, generated_project):
+        out, _ = generated_project
+        doc_browser = (out / "frontend" / "components" / "DocumentBrowser.tsx").read_text()
+        assert "PAGE_SIZE" in doc_browser
+        assert "page" in doc_browser.lower()
+
+
+class TestHealthcareEnumCompilation:
+    """Verify healthcare models.py with blood type enums compiles."""
+
+    def test_healthcare_models_compile(self, tmp_path):
+        from create_context_graph.config import ProjectConfig
+
+        config = ProjectConfig(
+            project_name="Healthcare Test",
+            domain="healthcare",
+            framework="pydanticai",
+        )
+        ontology = load_domain("healthcare")
+        out = tmp_path / "healthcare-test"
+        renderer = ProjectRenderer(config, ontology)
+        renderer.render(out)
+
+        models_path = out / "backend" / "app" / "models.py"
+        assert models_path.exists()
+        source = models_path.read_text()
+        compile(source, "models.py", "exec")
+        assert "A_PLUS" in source
+        assert "A_MINUS" in source
+
+
+class TestGISCartographyEnumCompilation:
+    """Verify gis-cartography models.py with 3d_model enum compiles."""
+
+    def test_gis_models_compile(self, tmp_path):
+        from create_context_graph.config import ProjectConfig
+
+        config = ProjectConfig(
+            project_name="GIS Test",
+            domain="gis-cartography",
+            framework="pydanticai",
+        )
+        ontology = load_domain("gis-cartography")
+        out = tmp_path / "gis-test"
+        renderer = ProjectRenderer(config, ontology)
+        renderer.render(out)
+
+        models_path = out / "backend" / "app" / "models.py"
+        assert models_path.exists()
+        source = models_path.read_text()
+        compile(source, "models.py", "exec")
+        assert "_3D_MODEL" in source

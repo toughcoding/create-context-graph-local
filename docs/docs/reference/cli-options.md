@@ -32,6 +32,8 @@ create-context-graph [PROJECT_NAME] [OPTIONS]
 | `--neo4j-local` | `flag` | -- | `false` | Use `@johnymontana/neo4j-local` for a lightweight local Neo4j instance (no Docker required, needs Node.js). Sets `neo4j_type` to `local`. |
 | `--anthropic-api-key` | `string` | `ANTHROPIC_API_KEY` | -- | Anthropic API key. Enables LLM-powered data generation (realistic entity names, documents, decision traces) and custom domain generation. |
 | `--output-dir` | `path` | -- | `./<project-slug>` | Directory where the generated project is written. Defaults to a kebab-case slug of the project name in the current working directory. |
+| `--dry-run` | `flag` | -- | `false` | Preview what would be generated (project config summary) without creating any files. |
+| `--verbose` | `flag` | -- | `false` | Enable verbose debug logging during generation. Useful for troubleshooting. |
 | `--list-domains` | `flag` | -- | -- | Print all available domain IDs and names, then exit. |
 | `--version` | `flag` | -- | -- | Print the installed version and exit. |
 | `--help` | `flag` | -- | -- | Show the help message and exit. |
@@ -133,6 +135,15 @@ create-context-graph my-app \
   --domain healthcare \
   --framework crewai \
   --output-dir /tmp/projects/healthcare-demo
+```
+
+### Preview without creating files
+
+```bash
+create-context-graph my-app \
+  --domain healthcare \
+  --framework pydanticai \
+  --dry-run
 ```
 
 ### List all available domains

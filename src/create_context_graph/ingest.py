@@ -69,8 +69,9 @@ async def _ingest_with_memory_client(
                 if stmt and not stmt.startswith("//"):
                     try:
                         await client.graph.execute_write(stmt)
-                    except Exception:
-                        pass  # Constraints may already exist
+                    except Exception as e:
+                        if "already exists" not in str(e).lower():
+                            console.print(f"  [yellow]Warning:[/yellow] Schema: {e}")
             progress.update(task, description="[1/4] Schema applied")
 
             # Step 2: Ingest entities (Long-term memory)
@@ -114,8 +115,8 @@ async def _ingest_with_memory_client(
                         },
                     )
                     rel_count += 1
-                except Exception:
-                    pass
+                except Exception as e:
+                    console.print(f"  [yellow]Warning:[/yellow] Relationship {rel.get('type', '?')}: {e}")
             console.print(f"  Created {rel_count} relationships")
 
             # Step 3: Ingest documents (Short-term memory)
@@ -210,8 +211,9 @@ async def _ingest_with_driver(
                 if stmt and not stmt.startswith("//"):
                     try:
                         await session.run(stmt)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        if "already exists" not in str(e).lower():
+                            console.print(f"  [yellow]Warning:[/yellow] Schema: {e}")
         progress.update(task, description="[1/3] Schema applied")
 
         # Create entities
@@ -226,8 +228,8 @@ async def _ingest_with_driver(
                     try:
                         await session.run(cypher, item)
                         entity_count += 1
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        console.print(f"  [yellow]Warning:[/yellow] Entity {item.get('name', '?')}: {e}")
         progress.update(task, description=f"[2/3] Created {entity_count} entities")
 
         # Create relationships
@@ -247,8 +249,8 @@ async def _ingest_with_driver(
                         "target_name": rel["target_name"],
                     })
                     rel_count += 1
-                except Exception:
-                    pass
+                except Exception as e:
+                    console.print(f"  [yellow]Warning:[/yellow] Relationship {rel.get('type', '?')}: {e}")
         progress.update(task, description=f"[3/3] Created {rel_count} relationships")
 
     await driver.close()

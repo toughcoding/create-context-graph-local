@@ -8,10 +8,13 @@ import {
   VStack,
   HStack,
   Badge,
+  Button,
   Flex,
 } from "@chakra-ui/react";
-import { FileText, ArrowLeft } from "lucide-react";
+import { FileText, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { API_BASE } from "@/lib/config";
+
+const PAGE_SIZE = 20;
 
 interface DocumentSummary {
   title: string;
@@ -35,18 +38,28 @@ export function DocumentBrowser() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<DocumentDetail | null>(null);
   const [filterTemplate, setFilterTemplate] = useState<string>("");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+
+  useEffect(() => {
+    setPage(0);
+  }, [filterTemplate]);
 
   useEffect(() => {
     loadDocuments();
-  }, [filterTemplate]);
+  }, [filterTemplate, page]);
 
   async function loadDocuments() {
     try {
       const params = new URLSearchParams();
       if (filterTemplate) params.set("template_id", filterTemplate);
+      params.set("skip", String(page * PAGE_SIZE));
+      params.set("limit", String(PAGE_SIZE + 1)); // fetch one extra to detect more
       const res = await fetch(`${API_BASE}/documents?${params}`);
       const data = await res.json();
-      setDocuments(data.documents || []);
+      const docs = data.documents || [];
+      setHasMore(docs.length > PAGE_SIZE);
+      setDocuments(docs.slice(0, PAGE_SIZE));
     } catch {
       // Backend may not be running yet
     }
@@ -184,6 +197,11 @@ export function DocumentBrowser() {
                 cursor="pointer"
                 onClick={() => selectDocument(doc.title)}
                 _hover={{ borderColor: "blue.200" }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e: React.KeyboardEvent) => {
+                  if (e.key === "Enter") selectDocument(doc.title);
+                }}
               >
                 <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
                   {doc.title}
@@ -196,6 +214,32 @@ export function DocumentBrowser() {
                 </Text>
               </Box>
             ))
+          )}
+          {/* Pagination */}
+          {(page > 0 || hasMore) && (
+            <HStack justify="center" py={2} gap={2}>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={14} /> Prev
+              </Button>
+              <Text fontSize="xs" color="gray.500">
+                Page {page + 1}
+              </Text>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasMore}
+                aria-label="Next page"
+              >
+                Next <ChevronRight size={14} />
+              </Button>
+            </HStack>
           )}
         </VStack>
       )}

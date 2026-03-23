@@ -53,7 +53,9 @@ docker-down:
 {% if neo4j_type == 'local' %}
 # Local Neo4j (no Docker required)
 neo4j-start:
-	npx --yes @johnymontana/neo4j-local start
+	@echo "Starting Neo4j in background..."
+	@npx --yes @johnymontana/neo4j-local start > /tmp/neo4j-local.log 2>&1 & \
+		sleep 2 && npx --yes @johnymontana/neo4j-local status
 
 neo4j-stop:
 	npx --yes @johnymontana/neo4j-local stop

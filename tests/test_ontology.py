@@ -21,6 +21,7 @@ from create_context_graph.ontology import (
     EntityTypeDef,
     PropertyDef,
     RelationshipDef,
+    _sanitize_enum_name,
     generate_cypher_schema,
     generate_pydantic_models,
     generate_visualization_config,
@@ -209,3 +210,64 @@ class TestGenerateVisualizationConfig:
         config = generate_visualization_config(financial_ontology)
         for et in financial_ontology.entity_types:
             assert et.label in config["nodeColors"]
+
+
+class TestSanitizeEnumName:
+    """Test _sanitize_enum_name handles special characters."""
+
+    def test_plus_sign(self):
+        assert _sanitize_enum_name("A+") == "A_PLUS"
+
+    def test_minus_sign(self):
+        assert _sanitize_enum_name("A-") == "A_MINUS"
+
+    def test_blood_types(self):
+        assert _sanitize_enum_name("AB+") == "AB_PLUS"
+        assert _sanitize_enum_name("AB-") == "AB_MINUS"
+        assert _sanitize_enum_name("O+") == "O_PLUS"
+        assert _sanitize_enum_name("O-") == "O_MINUS"
+
+    def test_leading_digit(self):
+        assert _sanitize_enum_name("3d_model") == "_3D_MODEL"
+
+    def test_all_digits(self):
+        assert _sanitize_enum_name("123") == "_123"
+
+    def test_normal_value(self):
+        assert _sanitize_enum_name("normal_value") == "NORMAL_VALUE"
+
+    def test_spaces(self):
+        assert _sanitize_enum_name("with spaces") == "WITH_SPACES"
+
+    def test_hyphens_as_separator(self):
+        """Hyphens between words are treated as separators, not minus."""
+        assert _sanitize_enum_name("some-value") == "SOME_VALUE"
+
+    def test_trailing_minus(self):
+        """Trailing minus is converted to _MINUS."""
+        assert _sanitize_enum_name("B-") == "B_MINUS"
+
+    def test_result_is_valid_identifier(self):
+        """All sanitized names must be valid Python identifiers."""
+        test_values = [
+            "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-",
+            "3d_model", "normal", "with spaces", "123numeric",
+        ]
+        for val in test_values:
+            result = _sanitize_enum_name(val)
+            assert result.isidentifier(), f"'{val}' -> '{result}' is not a valid identifier"
+
+
+class TestEnumModelsCompileAllDomains:
+    """Ensure models.py compiles for all domains (catches enum bugs)."""
+
+    ALL_DOMAINS = [d["id"] for d in list_available_domains()]
+
+    @pytest.mark.parametrize("domain_id", ALL_DOMAINS)
+    def test_models_compile(self, domain_id):
+        ontology = load_domain(domain_id)
+        source = generate_pydantic_models(ontology)
+        try:
+            compile(source, f"{domain_id}/models.py", "exec")
+        except SyntaxError as e:
+            pytest.fail(f"models.py syntax error for {domain_id}: {e}")

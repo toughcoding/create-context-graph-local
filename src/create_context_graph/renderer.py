@@ -161,6 +161,7 @@ class ProjectRenderer:
             "backend/shared/main.py.j2": "app/main.py",
             "backend/shared/config.py.j2": "app/config.py",
             "backend/shared/context_graph_client.py.j2": "app/context_graph_client.py",
+            "backend/shared/constants.py.j2": "app/constants.py",
             "backend/shared/gds_client.py.j2": "app/gds_client.py",
             "backend/shared/vector_client.py.j2": "app/vector_client.py",
             "backend/shared/models.py.j2": "app/models.py",

@@ -58,6 +58,13 @@ export function ChatInterface({ onGraphUpdate }: ChatInterfaceProps) {
           session_id: sessionId,
         }),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        const detail = errorData?.detail || `Backend error (${res.status})`;
+        throw new Error(detail);
+      }
+
       const data = await res.json();
 
       // Capture session_id from backend for multi-turn conversation
@@ -77,10 +84,13 @@ export function ChatInterface({ onGraphUpdate }: ChatInterfaceProps) {
       if (data.graph_data && onGraphUpdate) {
         onGraphUpdate(data.graph_data);
       }
-    } catch {
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error && err.message
+        ? err.message
+        : "Cannot reach the backend. Is it running?";
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Error connecting to the backend." },
+        { role: "assistant", content: `**Error:** ${errorMsg}` },
       ]);
     } finally {
       setLoading(false);

@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import click
@@ -52,6 +53,8 @@ console = Console()
 @click.option("--custom-domain", type=str, help="Natural language description for custom domain generation (requires --anthropic-api-key)")
 @click.option("--connector", multiple=True, help="SaaS connector to enable (github, slack, jira, notion, gmail, gcal, salesforce)")
 @click.option("--output-dir", type=click.Path(), help="Output directory (default: ./<project-name>)")
+@click.option("--dry-run", is_flag=True, help="Preview what would be generated without creating files")
+@click.option("--verbose", is_flag=True, help="Enable verbose debug output")
 @click.option("--list-domains", is_flag=True, help="List available domains and exit")
 @click.version_option(package_name="create-context-graph")
 def main(
@@ -69,6 +72,8 @@ def main(
     custom_domain: str | None,
     connector: tuple[str, ...],
     output_dir: str | None,
+    dry_run: bool,
+    verbose: bool,
     list_domains: bool,
 ) -> None:
     """Create a domain-specific context graph application.
@@ -77,6 +82,10 @@ def main(
     Next.js frontend, Neo4j knowledge graph, and AI agent—
     all customized for your industry domain.
     """
+    # Verbose logging
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(name)s %(levelname)s: %(message)s")
+
     # List domains mode
     if list_domains:
         domains = list_available_domains()
@@ -129,6 +138,11 @@ def main(
     else:
         neo4j_type_resolved = "docker"
 
+    # Validate empty project name in non-interactive mode
+    if project_name is not None and not project_name.strip():
+        console.print("[red]Error:[/red] Project name cannot be empty.")
+        raise SystemExit(1)
+
     # If all required args are provided, skip wizard
     if project_name and (domain or custom_domain) and framework:
         config = ProjectConfig(
@@ -153,6 +167,21 @@ def main(
 
     # Resolve output directory
     out = Path(output_dir) if output_dir else Path.cwd() / config.project_slug
+
+    # Dry run: show what would be generated and exit
+    if dry_run:
+        console.print("\n[bold]Dry run — no files will be created[/bold]\n")
+        console.print(f"  Project:    {config.project_name}")
+        console.print(f"  Slug:       {config.project_slug}")
+        console.print(f"  Domain:     {config.domain}")
+        console.print(f"  Framework:  {config.framework}")
+        console.print(f"  Neo4j:      {config.neo4j_type} ({config.neo4j_uri})")
+        console.print(f"  Data:       {config.data_source}")
+        if config.saas_connectors:
+            console.print(f"  Connectors: {', '.join(config.saas_connectors)}")
+        console.print(f"  Output:     {out}")
+        console.print()
+        return
     if out.exists() and any(out.iterdir()):
         console.print(f"[red]Error:[/red] Directory {out} already exists and is not empty.")
         raise SystemExit(1)

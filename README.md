@@ -245,6 +245,8 @@ Options:
   --neo4j-local             Use @johnymontana/neo4j-local for local Neo4j (no Docker)
   --anthropic-api-key TEXT  Anthropic API key for LLM generation [env: ANTHROPIC_API_KEY]
   --output-dir PATH         Output directory (default: ./<project-name>)
+  --dry-run                 Preview what would be generated without creating files
+  --verbose                 Enable verbose debug output
   --list-domains            List available domains and exit
   --version                 Show version and exit
   --help                    Show help and exit

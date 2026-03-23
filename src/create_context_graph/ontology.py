@@ -366,6 +366,35 @@ def generate_cypher_schema(ontology: DomainOntology) -> str:
     return "\n".join(lines)
 
 
+def _sanitize_enum_name(val: str) -> str:
+    """Convert an enum value string into a valid Python identifier.
+
+    Handles special characters (A+, A-, O+), leading digits (3d_model),
+    and other non-alphanumeric characters while preserving readability.
+    """
+    import re
+
+    name = val
+    # Replace + and - that are NOT word separators (e.g., A+, A-, O+)
+    # A trailing +/- or +/- not between two word chars is a sign, not a separator
+    name = re.sub(r"\+", "_PLUS", name)
+    # Hyphens between word chars are separators (kebab-case); otherwise they mean "minus"
+    name = re.sub(r"(?<=\w)-(?=\w)", "_", name)
+    name = name.replace("-", "_MINUS")
+    name = name.upper().replace(" ", "_")
+    # Remove any remaining invalid characters
+    name = re.sub(r"[^A-Z0-9_]", "", name)
+    # Collapse multiple underscores
+    name = re.sub(r"_+", "_", name).strip("_")
+    # Prepend underscore if it starts with a digit
+    if name and name[0].isdigit():
+        name = f"_{name}"
+    # Fallback for empty result
+    if not name:
+        name = "UNKNOWN"
+    return name
+
+
 def generate_pydantic_models(ontology: DomainOntology) -> str:
     """Generate Python Pydantic model source code from the ontology."""
     imports = [
@@ -389,7 +418,7 @@ def generate_pydantic_models(ontology: DomainOntology) -> str:
                 enum_name = f"{et.label}{prop.name.title().replace('_', '')}Enum"
                 enum_lines = [f"class {enum_name}(str, Enum):"]
                 for val in prop.enum:
-                    safe_name = val.upper().replace(" ", "_").replace("-", "_")
+                    safe_name = _sanitize_enum_name(val)
                     enum_lines.append(f'    {safe_name} = "{val}"')
                 enum_lines.append("")
                 enum_classes.append("\n".join(enum_lines))

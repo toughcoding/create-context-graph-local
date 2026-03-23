@@ -207,3 +207,32 @@ class TestMultipleDomainScaffolds:
         marker = framework_markers.get(framework)
         if marker:
             assert marker in agent, f"Agent file missing '{marker}' for framework {framework}"
+
+
+class TestCLIValidation:
+    """Tests for v0.4.0 CLI improvements."""
+
+    def test_dry_run_no_files_created(self, runner, tmp_path):
+        out = tmp_path / "dry-run-test"
+        result = runner.invoke(main, [
+            "dry-run-test",
+            "--domain", "healthcare",
+            "--framework", "pydanticai",
+            "--output-dir", str(out),
+            "--dry-run",
+        ])
+        assert result.exit_code == 0
+        assert "Dry run" in result.output
+        assert "healthcare" in result.output
+        assert not out.exists()
+
+    def test_verbose_flag_accepted(self, runner, tmp_path):
+        out = tmp_path / "verbose-test"
+        result = runner.invoke(main, [
+            "verbose-test",
+            "--domain", "healthcare",
+            "--framework", "pydanticai",
+            "--output-dir", str(out),
+            "--verbose",
+        ])
+        assert result.exit_code == 0

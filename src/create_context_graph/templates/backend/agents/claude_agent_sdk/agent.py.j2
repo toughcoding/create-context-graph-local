@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import uuid
 
 import anthropic
@@ -118,7 +119,7 @@ async def handle_message(message: str, session_id: str | None = None) -> dict:
 
     while True:
         response = await client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
             max_tokens=4096,
             system=SYSTEM_PROMPT,
             tools=TOOLS,

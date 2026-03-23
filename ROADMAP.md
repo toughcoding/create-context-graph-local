@@ -364,11 +364,40 @@ Addressed all critical and high-priority feedback from the v0.2.0 product review
 
 ---
 
+## Phase 7 — Hardening, Security & DX (v0.4.0)
+
+Based on comprehensive QA testing of all 176 domain-framework combinations.
+
+### Bug Fixes
+- **B-01** (Critical): Enum identifier sanitization — `A+`, `A-`, `3d_model` now generate valid Python identifiers (`A_PLUS`, `A_MINUS`, `_3D_MODEL`) with value aliases
+- **B-02** (Critical): Graceful degradation when Neo4j is unavailable — backend starts in degraded mode with `/health` endpoint reporting status
+- **B-03** (High): Cypher injection prevention in `gds_client.py` — label parameters validated against generated `ENTITY_LABELS` whitelist
+- **B-04** (High): CrewAI async/sync fix — replaced bare `asyncio.run()` with `_run_sync()` helper using `nest_asyncio`, crew runs in thread via `asyncio.to_thread()`
+- **B-05** (High): Claude Agent SDK model now configurable via `ANTHROPIC_MODEL` environment variable
+- **B-06** (Medium): Silent exception swallowing replaced with structured warnings in `ingest.py` and `vector_client.py`
+- **B-07** (Medium): JSON parsing error handling added to all 8 agent framework templates
+- **B-08** (Medium): Input validation (`max_length`) on chat and search request models
+- **B-09/B-10** (Low): CLI validates empty project names, adds `--dry-run` and `--verbose` flags
+
+### Security
+- CORS origins configurable via `CORS_ORIGINS` environment variable
+- Credential warnings in `.env.example`
+- Query timeouts (30s default) on all Neo4j operations
+
+### Code Quality
+- Magic strings extracted to `constants.py` module (index names, graph projections, embedding dimensions)
+- Frontend error messages: parse HTTP error responses, show actionable guidance
+- Document browser pagination (page size 20)
+- Semantic HTML landmarks (`<main>`, `<section>`, `<aside>`) and ARIA labels
+- 365 passing tests (51 new)
+
+---
+
 ## Summary
 
 | Phase | Description | Status | Tests |
 |-------|-------------|--------|-------|
-| 1 | Core CLI & Template Engine | **Complete** | 314 passing |
+| 1 | Core CLI & Template Engine | **Complete** | 365 passing |
 | 2 | Domain Expansion & Data Generation | **Complete** | (included above) |
 | 3 | Framework Templates & Frontend | **Complete** | (included above) |
 | 4 | SaaS Import & Custom Domains | **Complete** | (included above) |
@@ -376,3 +405,4 @@ Addressed all critical and high-priority feedback from the v0.2.0 product review
 | — | Data Quality & UI Enhancements | **Complete** | (included above) |
 | — | Graph Visualization & Agent Fixes | **Complete** | (included above) |
 | 6 | Memory Integration, Multi-Turn & DX | **Complete** | (included above) |
+| 7 | Hardening, Security & DX | **Complete** | (included above) |
