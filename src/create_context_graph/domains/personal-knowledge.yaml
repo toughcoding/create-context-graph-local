@@ -35,7 +35,7 @@ entity_types:
   - label: Contact
     pole_type: OBJECT
     subtype: PERSON_CONTACT
-    color: "#3b82f6"
+    color: "#0891b2"
     icon: user
     properties:
       - name: contact_id
@@ -100,7 +100,7 @@ entity_types:
   - label: Bookmark
     pole_type: OBJECT
     subtype: WEB_BOOKMARK
-    color: "#f97316"
+    color: "#d946ef"
     icon: bookmark
     properties:
       - name: bookmark_id
@@ -370,10 +370,10 @@ system_prompt: |
 visualization:
   node_colors:
     Note: "#fbbf24"
-    Contact: "#3b82f6"
+    Contact: "#0891b2"
     Project: "#8b5cf6"
     Topic: "#10b981"
-    Bookmark: "#f97316"
+    Bookmark: "#d946ef"
     JournalEntry: "#ec4899"
     Person: "#22c55e"
     Organization: "#64748b"

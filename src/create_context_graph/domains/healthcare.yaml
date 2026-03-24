@@ -32,7 +32,7 @@ entity_types:
   - label: Provider
     pole_type: PERSON
     subtype: PROVIDER
-    color: "#22c55e"
+    color: "#14b8a6"
     icon: stethoscope
     properties:
       - name: provider_id
@@ -116,7 +116,7 @@ entity_types:
   - label: Facility
     pole_type: LOCATION
     subtype: HEALTHCARE_FACILITY
-    color: "#a855f7"
+    color: "#6366f1"
     icon: building
     properties:
       - name: facility_id
@@ -394,11 +394,11 @@ system_prompt: |
 visualization:
   node_colors:
     Patient: "#06b6d4"
-    Provider: "#22c55e"
+    Provider: "#14b8a6"
     Diagnosis: "#ef4444"
     Treatment: "#10b981"
     Encounter: "#f59e0b"
-    Facility: "#a855f7"
+    Facility: "#6366f1"
     Medication: "#8b5cf6"
   node_sizes:
     Patient: 25

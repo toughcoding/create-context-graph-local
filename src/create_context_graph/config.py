@@ -52,11 +52,11 @@ FRAMEWORK_DISPLAY_NAMES = {
 FRAMEWORK_DEPENDENCIES = {
     "pydanticai": ["pydantic-ai>=0.1"],
     "claude-agent-sdk": ["claude-agent-sdk>=0.1", "anthropic>=0.30"],
-    "strands": ["strands-agents>=0.1", "nest-asyncio>=1.5"],
+    "strands": ["strands-agents>=0.1"],
     "google-adk": ["google-adk>=0.1", "nest-asyncio>=1.5"],
     "openai-agents": ["openai-agents>=0.1"],
     "langgraph": ["langgraph>=0.1", "langchain-anthropic>=0.3"],
-    "crewai": ["crewai>=0.1", "nest-asyncio>=1.5"],
+    "crewai": ["crewai>=0.1"],
     "anthropic-tools": ["anthropic>=0.30"],
 }
 

@@ -143,7 +143,7 @@ entity_types:
   - label: Achievement
     pole_type: EVENT
     subtype: GAME_MILESTONE
-    color: "#eab308"
+    color: "#f472b6"
     icon: trophy
     properties:
       - name: achievement_id
@@ -416,7 +416,7 @@ visualization:
     Item: "#d97706"
     Quest: "#dc2626"
     Guild: "#059669"
-    Achievement: "#eab308"
+    Achievement: "#f472b6"
   node_sizes:
     Person: 20
     Organization: 25

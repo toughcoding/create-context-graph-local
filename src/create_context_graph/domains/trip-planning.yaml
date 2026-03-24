@@ -63,7 +63,7 @@ entity_types:
   - label: Activity
     pole_type: OBJECT
     subtype: TRAVEL_ACTIVITY
-    color: "#f97316"
+    color: "#d946ef"
     icon: compass
     properties:
       - name: activity_id
@@ -142,7 +142,7 @@ entity_types:
   - label: Review
     pole_type: EVENT
     subtype: TRAVEL_REVIEW
-    color: "#eab308"
+    color: "#f472b6"
     icon: star
     properties:
       - name: review_id
@@ -403,10 +403,10 @@ visualization:
   node_colors:
     Destination: "#059669"
     Hotel: "#2563eb"
-    Activity: "#f97316"
+    Activity: "#d946ef"
     Restaurant: "#dc2626"
     Itinerary: "#8b5cf6"
-    Review: "#eab308"
+    Review: "#f472b6"
     Person: "#22c55e"
     Location: "#a855f7"
   node_sizes:

@@ -654,8 +654,8 @@ class TestGISCartographyEnumCompilation:
 # Streaming SSE support tests
 # ---------------------------------------------------------------------------
 
-STREAMING_FRAMEWORKS = ["pydanticai", "anthropic-tools", "claude-agent-sdk", "openai-agents", "langgraph"]
-NON_STREAMING_FRAMEWORKS = ["crewai", "strands", "google-adk"]
+STREAMING_FRAMEWORKS = ["pydanticai", "anthropic-tools", "claude-agent-sdk", "openai-agents", "langgraph", "google-adk"]
+NON_STREAMING_FRAMEWORKS = ["crewai", "strands"]
 
 
 class TestStreamingEndpoint:
@@ -855,3 +855,90 @@ class TestQABugFixes:
         content = dockerignore.read_text()
         assert "node_modules" in content
         assert ".venv" in content
+
+
+class TestDeferredBugFixes:
+    """Verify fixes for deferred QA bugs (BUG-010, BUG-011, BUG-013, BUG-016)."""
+
+    @pytest.mark.parametrize("framework", ["openai-agents", "strands", "crewai", "google-adk"])
+    def test_structured_conversation_history(self, tmp_path, framework):
+        """BUG-010: Affected frameworks must use structured history format."""
+        config = ProjectConfig(
+            project_name="History Test",
+            domain="financial-services",
+            framework=framework,
+        )
+        ontology = load_domain("financial-services")
+        out = tmp_path / "history-test"
+        renderer = ProjectRenderer(config, ontology)
+        renderer.render(out)
+        agent = (out / "backend" / "app" / "agent.py").read_text()
+        assert "<conversation_history>" in agent
+        assert "Previous conversation:" not in agent
+
+    def test_google_adk_session_reuse(self, tmp_path):
+        """BUG-010: Google ADK must skip history injection for existing sessions."""
+        config = ProjectConfig(
+            project_name="ADK Session Test",
+            domain="financial-services",
+            framework="google-adk",
+        )
+        ontology = load_domain("financial-services")
+        out = tmp_path / "adk-test"
+        renderer = ProjectRenderer(config, ontology)
+        renderer.render(out)
+        agent = (out / "backend" / "app" / "agent.py").read_text()
+        # Verify conditional logic: existing sessions skip history
+        assert "if session_id in _sessions:" in agent
+        assert "ADK manages multi-turn internally" in agent
+
+    def test_google_adk_has_streaming(self, tmp_path):
+        """BUG-011: Google ADK must have handle_message_stream."""
+        config = ProjectConfig(
+            project_name="ADK Stream Test",
+            domain="financial-services",
+            framework="google-adk",
+        )
+        ontology = load_domain("financial-services")
+        out = tmp_path / "adk-stream-test"
+        renderer = ProjectRenderer(config, ontology)
+        renderer.render(out)
+        agent = (out / "backend" / "app" / "agent.py").read_text()
+        assert "handle_message_stream" in agent
+        assert "emit_text_delta" in agent
+        assert "emit_done" in agent
+        compile(agent, "agent.py", "exec")
+
+    def test_crewai_requires_python_311(self, tmp_path):
+        """BUG-016: CrewAI projects must require Python 3.11+."""
+        config = ProjectConfig(
+            project_name="CrewAI Version Test",
+            domain="financial-services",
+            framework="crewai",
+        )
+        ontology = load_domain("financial-services")
+        out = tmp_path / "crewai-test"
+        renderer = ProjectRenderer(config, ontology)
+        renderer.render(out)
+        pyproject = (out / "backend" / "pyproject.toml").read_text()
+        assert '>=3.11' in pyproject
+
+    def test_non_crewai_requires_python_310(self, generated_project):
+        """BUG-016: Non-CrewAI projects must require Python 3.10+."""
+        out, _ = generated_project
+        pyproject = (out / "backend" / "pyproject.toml").read_text()
+        assert '>=3.10' in pyproject
+
+    def test_strands_no_nest_asyncio_dep(self, tmp_path):
+        """Phase 0: Strands must not depend on nest-asyncio."""
+        config = ProjectConfig(
+            project_name="Strands Dep Test",
+            domain="financial-services",
+            framework="strands",
+        )
+        ontology = load_domain("financial-services")
+        out = tmp_path / "strands-dep-test"
+        renderer = ProjectRenderer(config, ontology)
+        renderer.render(out)
+        pyproject = (out / "backend" / "pyproject.toml").read_text()
+        assert "nest-asyncio" not in pyproject

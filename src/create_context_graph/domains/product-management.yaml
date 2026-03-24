@@ -134,7 +134,7 @@ entity_types:
   - label: Feedback
     pole_type: EVENT
     subtype: USER_FEEDBACK
-    color: "#a855f7"
+    color: "#c084fc"
     icon: message-circle
     properties:
       - name: feedback_id
@@ -419,7 +419,7 @@ visualization:
     UserPersona: "#e11d48"
     Metric: "#16a34a"
     Release: "#ea580c"
-    Feedback: "#a855f7"
+    Feedback: "#c084fc"
     Objective: "#ca8a04"
   node_sizes:
     Person: 20

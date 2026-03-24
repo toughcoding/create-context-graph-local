@@ -81,13 +81,15 @@ async def handle_message(message: str, session_id: str | None = None) -> dict:
     history = await get_conversation_history(session_id)
     await store_message(session_id, "user", message)
 
-    # Build input with conversation history context
+    # Build input with structured conversation history
     if history:
-        context = "\n".join(
-            f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
-            for m in history
+        history_block = "\n\n".join(
+            f"[{m['role'].upper()}]\n{m['content']}" for m in history
         )
-        input_message = f"Previous conversation:\n{context}\n\nUser: {message}"
+        input_message = (
+            f"<conversation_history>\n{history_block}\n</conversation_history>\n\n"
+            f"[USER]\n{message}"
+        )
     else:
         input_message = message
 
@@ -114,13 +116,15 @@ async def handle_message_stream(message: str, session_id: str | None = None) -> 
     history = await get_conversation_history(session_id)
     await store_message(session_id, "user", message)
 
-    # Build input with conversation history context
+    # Build input with structured conversation history
     if history:
-        context = "\n".join(
-            f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
-            for m in history
+        history_block = "\n\n".join(
+            f"[{m['role'].upper()}]\n{m['content']}" for m in history
         )
-        input_message = f"Previous conversation:\n{context}\n\nUser: {message}"
+        input_message = (
+            f"<conversation_history>\n{history_block}\n</conversation_history>\n\n"
+            f"[USER]\n{message}"
+        )
     else:
         input_message = message
 

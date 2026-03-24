@@ -167,6 +167,28 @@ class TestLoadAllDomains:
                 f"Domain '{d['id']}' default_cypher missing LIMIT clause"
             )
 
+    def test_no_color_collisions_with_base(self):
+        """BUG-013: No domain entity should share a color with a base POLE+O entity."""
+        from create_context_graph.ontology import load_domain as _load
+        base = _load("healthcare")  # any domain to get base types
+        # Collect base entity colors (Person, Organization, Location, Event, Object)
+        base_labels = {"Person", "Organization", "Location", "Event", "Object"}
+        base_colors = {}
+        for et in base.entity_types:
+            if et.label in base_labels:
+                base_colors[et.label] = et.color
+
+        domains = list_available_domains()
+        for d in domains:
+            ont = load_domain(d["id"])
+            for et in ont.entity_types:
+                if et.label not in base_labels:
+                    for base_label, base_color in base_colors.items():
+                        assert et.color != base_color, (
+                            f"Domain '{d['id']}': {et.label} color {et.color} "
+                            f"collides with base {base_label}"
+                        )
+
 
 class TestGenerateCypherSchema:
     def test_generates_constraints(self, financial_ontology):

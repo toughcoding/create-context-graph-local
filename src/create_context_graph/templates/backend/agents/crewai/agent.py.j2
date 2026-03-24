@@ -91,15 +91,14 @@ async def handle_message(message: str, session_id: str | None = None) -> dict:
     history = await get_conversation_history(session_id)
     await store_message(session_id, "user", message)
 
-    # Build task description with conversation context
+    # Build task description with structured conversation history
     if history:
-        context = "\n".join(
-            f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
-            for m in history
+        history_block = "\n\n".join(
+            f"[{m['role'].upper()}]\n{m['content']}" for m in history
         )
         task_description = (
-            f"Previous conversation:\n{context}\n\n"
-            f"Current question: {message}"
+            f"<conversation_history>\n{history_block}\n</conversation_history>\n\n"
+            f"[USER]\n{message}"
         )
     else:
         task_description = message

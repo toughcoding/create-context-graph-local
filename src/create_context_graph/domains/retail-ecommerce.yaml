@@ -90,7 +90,7 @@ entity_types:
   - label: Review
     pole_type: EVENT
     subtype: FEEDBACK
-    color: "#eab308"
+    color: "#fbbf24"
     icon: star
     properties:
       - name: review_id
@@ -400,7 +400,7 @@ visualization:
     Customer: "#0891b2"
     Product: "#7c3aed"
     Order: "#ea580c"
-    Review: "#eab308"
+    Review: "#fbbf24"
     Campaign: "#db2777"
     Category: "#16a34a"
   node_sizes:

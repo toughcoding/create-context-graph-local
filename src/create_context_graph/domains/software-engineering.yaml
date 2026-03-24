@@ -56,7 +56,7 @@ entity_types:
   - label: PullRequest
     pole_type: EVENT
     subtype: PULL_REQUEST
-    color: "#22c55e"
+    color: "#14b8a6"
     icon: git-pull-request
     properties:
       - name: pr_id
@@ -79,7 +79,7 @@ entity_types:
   - label: Deployment
     pole_type: EVENT
     subtype: DEPLOYMENT
-    color: "#f97316"
+    color: "#f59e0b"
     icon: rocket
     properties:
       - name: deployment_id
@@ -391,8 +391,8 @@ visualization:
     Organization: "#3b82f6"
     Repository: "#6366f1"
     Issue: "#ef4444"
-    PullRequest: "#22c55e"
-    Deployment: "#f97316"
+    PullRequest: "#14b8a6"
+    Deployment: "#f59e0b"
     Service: "#0ea5e9"
     Incident: "#dc2626"
   node_sizes:

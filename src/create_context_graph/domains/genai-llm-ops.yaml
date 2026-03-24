@@ -35,7 +35,7 @@ entity_types:
   - label: Experiment
     pole_type: EVENT
     subtype: ML_EXPERIMENT
-    color: "#f97316"
+    color: "#d946ef"
     icon: flask-conical
     properties:
       - name: experiment_id
@@ -125,7 +125,7 @@ entity_types:
   - label: Deployment
     pole_type: EVENT
     subtype: MODEL_DEPLOYMENT
-    color: "#3b82f6"
+    color: "#0891b2"
     icon: rocket
     properties:
       - name: deployment_id
@@ -367,11 +367,11 @@ system_prompt: |
 visualization:
   node_colors:
     Model: "#7c3aed"
-    Experiment: "#f97316"
+    Experiment: "#d946ef"
     Dataset: "#06b6d4"
     Prompt: "#ec4899"
     Evaluation: "#10b981"
-    Deployment: "#3b82f6"
+    Deployment: "#0891b2"
     Person: "#22c55e"
     Organization: "#64748b"
   node_sizes:
