@@ -278,8 +278,9 @@ def run_wizard(
         if save:
             save_custom_domain(custom_ontology, custom_domain_yaml)
 
-        # Store the API key for later use
+        # Store the API key and base URL for later use
         anthropic_api_key = custom_api_key
+        anthropic_base_url = custom_base_url
 
     # Step 4: Agent framework
     if framework:
