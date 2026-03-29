@@ -128,7 +128,7 @@ cat /tmp/neo4j-local.log  # View generated password
 ```
 
 **Connection Details:**
-- URI: `bolt://localhost:7687`
+- URI: `neo4j://localhost:7687` (the `bolt://` form is also supported)
 - Username: `neo4j`
 - Database: `neo4j`
 - Password: Generated automatically (check logs)
