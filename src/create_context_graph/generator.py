@@ -73,6 +73,8 @@ def _llm_generate(client, provider: str, prompt: str, system: str = "") -> str:
             system=system,
             messages=[{"role": "user", "content": prompt}],
         )
+        if not response.content:
+            return ""
         # Handle both text content and thinking blocks
         content = response.content[0]
         if hasattr(content, 'text'):
