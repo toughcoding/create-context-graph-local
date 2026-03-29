@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useState, lazy, Suspense } from "react";
 import Link from "@docusaurus/Link";
 import Layout from "@theme/Layout";
-import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { TerminalAnimation } from "@site/src/components/animations/TerminalAnimation";
 import { HERO_COPY, SECTION_COPY } from "@site/src/data/animation-config";
@@ -89,32 +89,34 @@ function HeroSection(): ReactNode {
           </Link>
         </motion.div>
 
-        {/* Terminal / App Preview morph */}
+        {/* Terminal / App Preview crossfade */}
         <div className={styles.heroAnimation}>
-          <LayoutGroup>
-            <AnimatePresence mode="wait">
-              {!showPreview ? (
+          <AnimatePresence mode="wait">
+            {!showPreview ? (
+              <motion.div
+                key="terminal"
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.4 }}
+              >
                 <TerminalAnimation
-                  key="terminal"
-                  layoutId="hero-frame"
                   onComplete={() => setShowPreview(true)}
                 />
-              ) : (
-                <Suspense
-                  fallback={<SectionPlaceholder height="400px" />}
+              </motion.div>
+            ) : (
+              <Suspense
+                fallback={<SectionPlaceholder height="400px" />}
+              >
+                <motion.div
+                  key="preview"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.6 }}
                 >
-                  <motion.div
-                    key="preview"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.6 }}
-                  >
-                    <AppPreview layoutId="hero-frame" />
-                  </motion.div>
-                </Suspense>
-              )}
-            </AnimatePresence>
-          </LayoutGroup>
+                  <AppPreview />
+                </motion.div>
+              </Suspense>
+            )}
+          </AnimatePresence>
         </div>
 
         {showPreview && (

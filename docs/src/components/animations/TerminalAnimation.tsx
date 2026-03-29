@@ -17,12 +17,10 @@ const SPINNER_CHARS = ["\u25DC", "\u25DD", "\u25DE", "\u25DF"];
 
 interface TerminalAnimationProps {
   onComplete?: () => void;
-  layoutId?: string;
 }
 
 export function TerminalAnimation({
   onComplete,
-  layoutId,
 }: TerminalAnimationProps) {
   const reducedMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>(
@@ -181,7 +179,6 @@ export function TerminalAnimation({
   return (
     <div className={styles.wrapper} style={{ position: "relative" }}>
       <Terminal
-        layoutId={layoutId}
         title="create-context-graph"
         aria-label="Animated terminal simulation showing the create-context-graph CLI wizard scaffolding a healthcare app with the PydanticAI framework"
       >
@@ -206,12 +203,7 @@ export function TerminalAnimation({
                 transition={{ duration: 0.3 }}
               >
                 <div className={styles.banner}>
-                  {`
- ___              _        ___         _           _
-/ __|_ _ ___ __ _| |_ ___ / __|___ _ _| |_ _____ _| |_
-| (__| '_/ -_) _\` |  _/ -_) (__/ _ \\ ' \\  _/ -_)\\ \\ /  _|
-\\___|_| \\___\\__,_|\\__\\___|\\___|\\___/_||_\\__\\___|/_\\_\\\\__|
-                  `.trim()}
+                  Create Context Graph
                 </div>
                 <div className={styles.version}>
                   v0.6.0 — Graph Memory for AI Agents

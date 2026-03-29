@@ -4,10 +4,6 @@ import { BrowserFrame } from "@site/src/components/ui/BrowserFrame";
 import { COLORS } from "@site/src/data/animation-config";
 import styles from "./AppPreview.module.css";
 
-interface AppPreviewProps {
-  layoutId?: string;
-}
-
 const USER_QUERY =
   "Show me patients with diabetes who were treated in the last 30 days";
 const ASSISTANT_RESPONSE =
@@ -34,7 +30,7 @@ const GRAPH_EDGES = [
   { source: "doctor", target: "department", label: "BELONGS_TO" },
 ];
 
-export function AppPreview({ layoutId }: AppPreviewProps) {
+export function AppPreview() {
   const reducedMotion = useReducedMotion();
   const [chatPhase, setChatPhase] = useState(0); // 0=user, 1=tool, 2=toolDone, 3=response
   const [responseChars, setResponseChars] = useState(0);
@@ -105,7 +101,7 @@ export function AppPreview({ layoutId }: AppPreviewProps) {
 
   return (
     <div className={styles.container}>
-      <BrowserFrame url="localhost:3000" layoutId={layoutId}>
+      <BrowserFrame url="localhost:3000">
         <div className={styles.panels}>
           {/* Chat Panel */}
           <div className={styles.chatPanel}>
