@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import uuid
 
-import langgraph
 from langchain_anthropic import ChatAnthropic
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
@@ -42,6 +41,7 @@ async def {{ tool.name }}({% for param in tool.parameters %}{{ param.name }}: {{
 
 {% endfor %}
 
+{% raw %}
 @tool
 async def run_cypher(query: str, parameters: str = "{}") -> str:
     """Execute a read-only Cypher query against the knowledge graph."""
@@ -56,11 +56,13 @@ async def run_cypher(query: str, parameters: str = "{}") -> str:
     except Exception as e:
         return json.dumps({"error": f"Cypher query failed: {e}"})
 
+
 @tool
 async def get_graph_schema() -> str:
     """Get the knowledge graph schema (node labels and relationship types)."""
     result = await get_schema()
     return json.dumps(result, default=str)
+{% endraw %}
 
 TOOLS = [
 {% for tool in agent_tools %}

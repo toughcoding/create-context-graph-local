@@ -204,7 +204,7 @@ class ProjectRenderer:
         agent_template = f"backend/agents/{fw_key}/agent.py.j2"
         try:
             self._render_template(agent_template, backend_dir / "app" / "agent.py", ctx)
-        except Exception as e:
+        except Exception:
             # Fallback: render a minimal agent stub
             self._render_template(
                 "backend/shared/agent_stub.py.j2",

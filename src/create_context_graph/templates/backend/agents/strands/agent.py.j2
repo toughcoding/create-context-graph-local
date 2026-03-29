@@ -33,8 +33,6 @@ if not os.environ.get("ANTHROPIC_API_KEY"):
 {% if anthropic_base_url %}
 os.environ["ANTHROPIC_BASE_URL"] = "{{ anthropic_base_url }}"
 {% endif %}
-{% raw %}
-{% endraw %}
 
 
 _main_loop: asyncio.AbstractEventLoop | None = None
