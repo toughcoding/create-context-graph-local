@@ -159,6 +159,24 @@ def main(
         console.print("[red]Error:[/red] Project name cannot be empty.")
         raise SystemExit(1)
 
+    # Auto-generate project name when all required flags are provided but no positional arg
+    if not project_name and (domain or custom_domain) and framework:
+        domain_part = domain or "custom"
+        project_name = f"{domain_part}-{framework}-app"
+
+    # Non-TTY detection: give a helpful error when wizard would be required but stdin isn't interactive
+    import sys
+    if not project_name and not sys.stdin.isatty():
+        missing = []
+        if not domain and not custom_domain:
+            missing.append("--domain")
+        if not framework:
+            missing.append("--framework")
+        console.print(f"[red]Error:[/red] Non-interactive mode requires: {', '.join(missing or ['--domain and --framework'])}")
+        console.print("Tip: Provide all required flags, e.g.:")
+        console.print("  create-context-graph --domain healthcare --framework pydanticai --demo-data")
+        raise SystemExit(1)
+
     # If all required args are provided, skip wizard
     if project_name and (domain or custom_domain) and framework:
         config = ProjectConfig(
@@ -183,6 +201,12 @@ def main(
             console.print(
                 "[yellow]Warning:[/yellow] google-adk framework requires a Google/Gemini API key. "
                 "Set GOOGLE_API_KEY in your .env or pass --google-api-key."
+            )
+        # Warn if openai-agents is selected without an OpenAI API key
+        if config.resolved_framework == "openai-agents" and not openai_api_key:
+            console.print(
+                "[yellow]Warning:[/yellow] openai-agents framework requires an OpenAI API key. "
+                "Set OPENAI_API_KEY in your .env or pass --openai-api-key."
             )
     else:
         # Launch interactive wizard

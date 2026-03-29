@@ -396,6 +396,16 @@ def run_wizard(
     else:
         anthropic_base_url = questionary.text(
             "Anthropic-compatible API base URL (Enter to use default):",
+    if framework == "openai-agents":
+        openai_api_key = questionary.password(
+            "OpenAI API key (required for OpenAI Agents SDK):",
+            default="",
+        ).ask()
+        if not openai_api_key:
+            console.print("[yellow]Warning:[/yellow] OpenAI Agents SDK requires OPENAI_API_KEY. Set it in your .env file.")
+    else:
+        openai_api_key = questionary.password(
+            "OpenAI API key (optional — for OpenAI embeddings, or Enter to skip):",
             default="",
         ).ask()
 
