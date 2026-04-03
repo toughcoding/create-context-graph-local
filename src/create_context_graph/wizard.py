@@ -397,6 +397,9 @@ def run_wizard(
     else:
         anthropic_base_url = questionary.text(
             "Anthropic-compatible API base URL (Enter to use default):",
+            default="",
+        ).ask()
+
     if framework == "openai-agents":
         openai_api_key = questionary.password(
             "OpenAI API key (required for OpenAI Agents SDK):",
