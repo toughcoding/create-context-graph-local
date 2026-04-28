@@ -42,12 +42,15 @@ console = Console()
 # ---------------------------------------------------------------------------
 
 
-def _get_llm_client(api_key: str, provider: str = "anthropic"):
+def _get_llm_client(api_key: str, provider: str = "anthropic", base_url: str | None = None):
     """Get an LLM client for generation."""
     if provider == "anthropic":
         try:
             import anthropic
-            return anthropic.Anthropic(api_key=api_key), "anthropic"
+            client_kwargs = {"api_key": api_key}
+            if base_url:
+                client_kwargs["base_url"] = base_url
+            return anthropic.Anthropic(**client_kwargs), "anthropic"
         except ImportError:
             pass
 
@@ -70,7 +73,23 @@ def _llm_generate(client, provider: str, prompt: str, system: str = "") -> str:
             system=system,
             messages=[{"role": "user", "content": prompt}],
         )
-        return response.content[0].text
+        if not response.content:
+            return ""
+        # Handle both text content and thinking blocks
+        content = response.content[0]
+        if hasattr(content, 'text'):
+            return content.text
+        elif hasattr(content, 'thinking'):
+            # Find the next text block after thinking
+            for block in response.content:
+                if hasattr(block, 'text'):
+                    return block.text
+        # Fallback: extract text from all blocks
+        text_parts = []
+        for block in response.content:
+            if hasattr(block, 'text'):
+                text_parts.append(block.text)
+        return ''.join(text_parts)
     elif provider == "openai":
         messages = []
         if system:
@@ -136,7 +155,75 @@ Return a JSON array of objects. Each object must have a "name" field plus the ot
         for et in ontology.entity_types:
             entities[et.label] = _generate_static_entities(et, domain_id=domain_id)
 
+    # Post-process: clamp unrealistic values
+    _validate_and_clamp(entities)
+
     return entities
+
+
+# Domain-appropriate value ranges for common property names
+_PROPERTY_CLAMP_RANGES: dict[str, tuple[float, float]] = {
+    "price_per_night": (30.0, 2000.0),
+    "daily_cost": (20.0, 3000.0),
+    "duration_hours": (0.25, 24.0),
+    "duration_minutes": (5.0, 480.0),
+    "cost": (1.0, 100000.0),
+    "price": (0.50, 50000.0),
+    "budget": (100.0, 10000000.0),
+    "rating": (1.0, 5.0),
+    "confidence": (0.0, 1.0),
+    "accuracy": (0.0, 100.0),
+    "efficiency": (0.0, 100.0),
+    "score": (0.0, 100.0),
+    "population_estimate": (1.0, 10000000000.0),
+    "capacity": (1.0, 1000000.0),
+    "capacity_per_hour": (1.0, 100000.0),
+    "weight": (0.001, 1000000.0),
+    "temperature": (-100.0, 1000.0),
+    "pressure": (0.0, 100000.0),
+    "latitude": (-90.0, 90.0),
+    "longitude": (-180.0, 180.0),
+    "elevation": (-500.0, 9000.0),
+    "area": (0.01, 100000000.0),
+    "length": (0.001, 100000.0),
+    "depth": (0.0, 12000.0),
+    "age": (0.0, 200.0),
+    "percentage": (0.0, 100.0),
+    "rate": (0.0, 100.0),
+}
+
+# Known taxonomy class -> valid values
+_TAXONOMY_CLASS_MAP: dict[str, str] = {
+    "bengal tiger": "mammalia", "african elephant": "mammalia",
+    "snow leopard": "mammalia", "gray wolf": "mammalia",
+    "mountain gorilla": "mammalia", "giant panda": "mammalia",
+    "polar bear": "mammalia", "blue whale": "mammalia",
+    "rhinoceros": "mammalia", "orangutan": "mammalia",
+    "sea turtle": "reptilia", "komodo dragon": "reptilia",
+    "bald eagle": "aves", "california condor": "aves",
+    "penguin": "aves", "flamingo": "aves",
+    "coral": "anthozoa", "frog": "amphibia", "salamander": "amphibia",
+}
+
+
+def _validate_and_clamp(entities: dict[str, list[dict]]) -> None:
+    """Post-process entities to clamp unrealistic numeric values and fix taxonomy."""
+    for label, items in entities.items():
+        for entity in items:
+            for key, value in entity.items():
+                # Clamp numeric values
+                if isinstance(value, (int, float)) and key in _PROPERTY_CLAMP_RANGES:
+                    lo, hi = _PROPERTY_CLAMP_RANGES[key]
+                    clamped = max(lo, min(hi, float(value)))
+                    entity[key] = int(clamped) if isinstance(value, int) else round(clamped, 2)
+
+                # Fix taxonomy class based on entity name
+                if key == "taxonomy_class" and isinstance(value, str):
+                    name_lower = entity.get("name", "").lower()
+                    for species_key, correct_class in _TAXONOMY_CLASS_MAP.items():
+                        if species_key in name_lower:
+                            entity[key] = correct_class
+                            break
 
 
 def _generate_static_entities(et, *, domain_id: str | None = None) -> list[dict]:
@@ -251,10 +338,21 @@ Write 200-400 words of realistic, professional content. Do not include any metad
                     template, ontology, entities, i
                 )
 
+            # Derive title from primary entity reference
+            primary_name = None
+            if template.required_entities:
+                primary_label = template.required_entities[0]
+                label_entities = entities.get(primary_label, [])
+                if label_entities:
+                    entity = label_entities[i % len(label_entities)]
+                    primary_name = entity.get("name")
+
+            title = f"{template.name}: {primary_name}" if primary_name else f"{template.name} #{i + 1}"
+
             documents.append({
                 "template_id": template.id,
                 "template_name": template.name,
-                "title": f"{template.name} #{i + 1}",
+                "title": title,
                 "content": content,
             })
 
@@ -278,28 +376,28 @@ def _generate_static_document(template, ontology, entities, index) -> str:
     doc_date = generate_date()
 
     return (
-        f"{template.name}\n"
-        f"{'=' * len(template.name)}\n\n"
-        f"Date: {doc_date}\n"
-        f"Domain: {ontology.domain.name}\n"
-        f"Reference: {context_str}\n\n"
-        f"Summary\n-------\n"
+        f"# {template.name}\n\n"
+        f"**Date:** {doc_date}  \n"
+        f"**Domain:** {ontology.domain.name}  \n"
+        f"**Reference:** {context_str}\n\n"
+        f"## Summary\n\n"
         f"This {template.name.lower()} documents {template.description.lower()}. "
         f"It pertains to {context_str} and was prepared as part of standard "
         f"{ontology.domain.name.lower()} operations.\n\n"
-        f"Details\n-------\n"
+        f"## Details\n\n"
         f"The following information has been compiled based on available records "
         f"and observations. All referenced entities have been verified against "
         f"the current knowledge graph.\n\n"
         f"Key findings and observations related to {context_str} are documented "
         f"below. This record should be reviewed in conjunction with related "
         f"documents and entity records for complete context.\n\n"
-        f"Recommendations\n---------------\n"
+        f"## Recommendations\n\n"
         f"Based on the analysis of {context_str}, the following actions are "
         f"recommended for continued monitoring and follow-up. Please refer to "
         f"the relevant entity profiles and prior {template.name.lower()} records "
         f"for historical context and trend analysis.\n\n"
-        f"Document generated for {ontology.domain.name} context graph application."
+        f"---\n\n"
+        f"*Document generated for {ontology.domain.name} context graph application.*"
     )
 
 
@@ -308,17 +406,49 @@ def _generate_static_document(template, ontology, entities, index) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _generate_static_observation(action: str, domain_name: str) -> str:
+def _generate_static_observation(
+    action: str,
+    domain_name: str,
+    entities: dict[str, list[dict]] | None = None,
+) -> str:
     """Generate a realistic observation for a decision trace step."""
+    # Pick a random entity name for context if available
+    entity_ref = ""
+    if entities:
+        all_entities = [e for elist in entities.values() for e in elist if e.get("name")]
+        if all_entities:
+            picked = random.choice(all_entities)
+            entity_ref = picked.get("name", "")
+
     action_lower = action.lower()
+    count = random.randint(3, 12)
     if "query" in action_lower or "search" in action_lower or "retrieve" in action_lower:
-        return f"Found 7 relevant records in the {domain_name.lower()} knowledge graph matching the search criteria. Results sorted by relevance and recency."
+        if entity_ref:
+            return (
+                f"Found {count} relevant records in the {domain_name.lower()} knowledge graph. "
+                f"Top result: {entity_ref} with {random.randint(2, 6)} connected entities."
+            )
+        return f"Found {count} relevant records in the {domain_name.lower()} knowledge graph matching the search criteria."
     if "check" in action_lower or "verify" in action_lower or "validate" in action_lower:
+        if entity_ref:
+            return (
+                f"Verified {entity_ref} against {domain_name.lower()} standards. "
+                f"All {random.randint(3, 8)} checked parameters within acceptable thresholds."
+            )
         return f"Validation completed successfully. All checked parameters are within acceptable thresholds for {domain_name.lower()} standards."
     if "calculate" in action_lower or "compute" in action_lower or "analyze" in action_lower:
+        if entity_ref:
+            return (
+                f"Analysis of {entity_ref} complete. Key metrics computed and compared against "
+                f"historical baselines — {random.randint(2, 5)} indicators flagged for review."
+            )
         return "Analysis complete. Key metrics computed and compared against historical baselines. Results indicate normal operational parameters."
     if "review" in action_lower:
-        return "Review of available records completed. Identified 3 key factors relevant to the current decision context."
+        if entity_ref:
+            return f"Review of {entity_ref} completed. Identified {random.randint(2, 5)} key factors relevant to the current decision context."
+        return f"Review of available records completed. Identified {random.randint(2, 5)} key factors relevant to the current decision context."
+    if entity_ref:
+        return f"Action completed for {entity_ref}. Results consistent with expected {domain_name.lower()} domain patterns."
     return f"Action completed. Results consistent with expected {domain_name.lower()} domain patterns and prior observations."
 
 
@@ -404,7 +534,7 @@ def _generate_decision_traces(
 
         steps = []
         for step in trace_def.steps:
-            observation = step.observation or _generate_static_observation(step.action, ontology.domain.name)
+            observation = step.observation or _generate_static_observation(step.action, ontology.domain.name, entities)
             if client and provider:
                 try:
                     observation = _llm_generate(

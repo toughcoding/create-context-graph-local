@@ -50,6 +50,7 @@ console = Console()
 @click.option("--neo4j-aura-env", type=click.Path(exists=True), help="Path to Neo4j Aura .env file with credentials")
 @click.option("--neo4j-local", is_flag=True, help="Use @johnymontana/neo4j-local for local Neo4j (no Docker)")
 @click.option("--anthropic-api-key", envvar="ANTHROPIC_API_KEY", help="Anthropic API key for LLM generation")
+@click.option("--anthropic-base-url", envvar="ANTHROPIC_BASE_URL", help="Anthropic-compatible API base URL (e.g., http://127.0.0.1:8082)")
 @click.option("--openai-api-key", envvar="OPENAI_API_KEY", help="OpenAI API key for LLM generation")
 @click.option("--google-api-key", envvar="GOOGLE_API_KEY", help="Google/Gemini API key (required for google-adk framework)")
 @click.option("--custom-domain", type=str, help="Natural language description for custom domain generation (requires --anthropic-api-key)")
@@ -73,6 +74,7 @@ def main(
     neo4j_aura_env: str | None,
     neo4j_local: bool,
     anthropic_api_key: str | None,
+    anthropic_base_url: str | None,
     openai_api_key: str | None,
     google_api_key: str | None,
     custom_domain: str | None,
@@ -124,7 +126,7 @@ def main(
         console.print("[bold]Generating custom domain ontology...[/bold]")
         try:
             custom_ontology, custom_domain_yaml = generate_custom_domain(
-                custom_domain, anthropic_api_key
+                custom_domain, anthropic_api_key, base_url=anthropic_base_url
             )
         except ValueError as e:
             console.print(f"[red]Error:[/red] {e}")
@@ -157,6 +159,24 @@ def main(
         console.print("[red]Error:[/red] Project name cannot be empty.")
         raise SystemExit(1)
 
+    # Auto-generate project name when all required flags are provided but no positional arg
+    if not project_name and (domain or custom_domain) and framework:
+        domain_part = domain or "custom"
+        project_name = f"{domain_part}-{framework}-app"
+
+    # Non-TTY detection: give a helpful error when wizard would be required but stdin isn't interactive
+    import sys
+    if not project_name and not sys.stdin.isatty():
+        missing = []
+        if not domain and not custom_domain:
+            missing.append("--domain")
+        if not framework:
+            missing.append("--framework")
+        console.print(f"[red]Error:[/red] Non-interactive mode requires: {', '.join(missing or ['--domain and --framework'])}")
+        console.print("Tip: Provide all required flags, e.g.:")
+        console.print("  create-context-graph --domain healthcare --framework pydanticai --demo-data")
+        raise SystemExit(1)
+
     # If all required args are provided, skip wizard
     if project_name and (domain or custom_domain) and framework:
         config = ProjectConfig(
@@ -169,6 +189,7 @@ def main(
             neo4j_password=neo4j_password,
             neo4j_type=neo4j_type_resolved,
             anthropic_api_key=anthropic_api_key,
+            anthropic_base_url=anthropic_base_url,
             openai_api_key=openai_api_key,
             google_api_key=google_api_key,
             generate_data=demo_data,
@@ -181,11 +202,31 @@ def main(
                 "[yellow]Warning:[/yellow] google-adk framework requires a Google/Gemini API key. "
                 "Set GOOGLE_API_KEY in your .env or pass --google-api-key."
             )
+        # Warn if openai-agents is selected without an OpenAI API key
+        if config.resolved_framework == "openai-agents" and not openai_api_key:
+            console.print(
+                "[yellow]Warning:[/yellow] openai-agents framework requires an OpenAI API key. "
+                "Set OPENAI_API_KEY in your .env or pass --openai-api-key."
+            )
     else:
         # Launch interactive wizard
         from create_context_graph.wizard import run_wizard
 
-        config = run_wizard()
+        config = run_wizard(
+            project_name=project_name,
+            domain=domain,
+            framework=framework,
+            anthropic_api_key=anthropic_api_key,
+            anthropic_base_url=anthropic_base_url,
+            openai_api_key=openai_api_key,
+            connector=connector,
+            demo_data=demo_data,
+            neo4j_uri=neo4j_uri,
+            neo4j_username=neo4j_username,
+            neo4j_password=neo4j_password,
+            neo4j_local=neo4j_local,
+            neo4j_aura_env=neo4j_aura_env,
+        )
 
     # Resolve output directory
     out = Path(output_dir) if output_dir else Path.cwd() / config.project_slug

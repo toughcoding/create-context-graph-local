@@ -1,5 +1,77 @@
 # Changelog
 
+## v0.8.0 — Embedding Fix, Data Quality & Documentation (2026-03-28)
+
+### Critical Fixes
+- **neo4j-agent-memory no longer requires OpenAI API key** — Removed `[openai]` extra from the generated `pyproject.toml` dependency. Conversation memory now uses local `sentence-transformers` (`all-MiniLM-L6-v2`, 384 dims) by default. If `OPENAI_API_KEY` is set in the environment, automatically upgrades to OpenAI `text-embedding-3-small` (1536 dims). Added `sentence-transformers>=2.0` as an explicit dependency so local embeddings work out of the box with zero API keys.
+- **openai-agents framework warns about missing API key** — CLI now displays a clear warning when `--framework openai-agents` is selected without `--openai-api-key`. The interactive wizard prompt text changes to indicate the key is "required" (not optional) for this framework.
+
+### Data Quality
+- **67 new entity name pools** — Added domain-appropriate names for every entity label across all 22 domains. `LABEL_NAMES` now has 118 entries (up from 51), eliminating all "Label 1" / "Label 2" fallback names. Covers agent-memory (Conversation, Memory, Session, ToolCall), digital-twin (Alert, Asset, Sensor, Reading, MaintenanceRecord, System), golf-sports (Round, Handicap, Hole, Course, Tournament), hospitality (Room, Reservation, Guest, Staff), oil-gas (Well, Equipment, Reservoir, Formation, Permit), personal-knowledge (JournalEntry, Note, Bookmark, Contact, Topic, Project), retail-ecommerce (Order, Product, Customer, Campaign, Category), vacation-industry (Booking, Package, Resort, Season), wildlife-management (Sighting, Camera, Habitat, Individual, Threat), conservation (Stakeholder), data-journalism (Correction), GIS (Boundary, Coordinate, Feature, Layer, MapProject, Survey), GenAI/LLM-Ops (Model, Prompt, Evaluation, Experiment), product-management (Epic, Metric, Objective, Release, Feedback, UserPersona), and scientific-research (Paper, Researcher, Grant, Institution).
+- **Post-generation value clamping** — LLM-generated entities are now post-processed by `_validate_and_clamp()` in `generator.py`. Clamps 28 property types to domain-reasonable ranges (e.g., `price_per_night`: $30–$2,000; `duration_hours`: 0.25–24; `rating`: 1–5; `latitude`: -90–90). Also corrects taxonomy class mismatches (e.g., Bengal Tiger → "mammalia", not "aves").
+- **Richer entity descriptions** — Added `_LOCATION_LABELS`, `_EVENT_LABELS`, and `_OBJECT_LABELS` sets (parallel to existing `_PERSON_LABELS`/`_ORGANIZATION_LABELS`) for POLE-type-aware descriptions. Added 7 label-specific description overrides for Medication, Permit, Sensor, Equipment, Paper, Model, and Species. Fallback descriptions no longer say "record tracked in the knowledge graph".
+- **digital-twin fixture fix** — Fixed label casing in `digital-twin.json` (UPPERCASE → PascalCase) to match the domain YAML schema.
+- **Domain-scoped entity MERGE keys** — Changed entity MERGE from `{name: $name}` to `{name: $name, domain: $domain}` in both `generate_data.py.j2` and `ingest.py`. Prevents constraint violation warnings when multiple domains share a single Neo4j instance.
+
+### Framework Fixes
+- **google-adk AttributeError guard** — Added `try/except AttributeError` around `runner.run_async()` in both `handle_message` and `handle_message_stream` to gracefully handle the `google-genai` SDK's `BaseApiClient` cleanup error when `_async_httpx_client` was never initialized.
+
+### Documentation
+- **Quick-Start page** — New `docs/quick-start.md` with a 5-step guide: scaffold → Neo4j setup → configure → seed → start.
+- **use-neo4j-local guide** — New `docs/how-to/use-neo4j-local.md` covering `@johnymontana/neo4j-local` (npx), Neo4j Desktop, and Docker standalone with troubleshooting tips.
+- **Domain catalog** — New `docs/reference/domain-catalog.md` listing all 22 domains with entity types, agent tool counts, sample questions, and scaffold commands. Auto-generated from domain YAML files.
+- **Architecture diagram** — Mermaid flowchart added to the Introduction page showing CLI → Template Engine → Backend/Frontend → Neo4j data flow. Added `@docusaurus/theme-mermaid` for rendering.
+- **switch-frameworks 404 fix** — Added `slug: switch-frameworks` to frontmatter so `/docs/how-to/switch-frameworks` resolves correctly.
+- **Updated navigation** — Sidebar now includes quick-start, use-neo4j-local, and domain-catalog pages.
+
+### Frontend UX
+- **Larger status indicator** — Backend health dot enlarged from 8px to 12px with a text label ("Connected" / "Degraded" / "Offline").
+- **Health check retry on initial load** — First page load now retries the health check 3 times with exponential backoff (1s, 2s, 4s) before showing "Offline". Prevents the transient "Internal Server Error" on initial Next.js compilation.
+- **Improved empty graph state** — Empty knowledge graph panel now shows a link icon, "Your knowledge graph will appear here" heading, and actionable guidance text instead of a minimal "No graph data to display" message.
+
+### Testing
+- 691 passing tests (89 new), up from 602
+- **New `tests/test_fixtures.py`** (88 tests) — Cross-validates all 22 domains:
+  - Schema alignment: fixture entities have all required YAML properties
+  - Agent tool property references: Cypher queries only reference properties that exist in schema or fixtures
+  - Label coverage: fixtures include entities for every YAML-defined label
+  - Data quality: numeric property values fall within reasonable ranges
+
+## v0.6.1 — Stability, Data Quality & Tool Coverage (2026-03-28)
+
+### Critical Bug Fixes
+- **CrewAI dependency fix** — Changed `crewai>=0.1` to `crewai[anthropic]>=0.1` in framework dependencies. The crewai agent template uses `llm="anthropic/claude-sonnet-4-20250514"` which requires the anthropic extra. Without it, the generated project crashes on startup with `ImportError: Anthropic native provider not available`.
+- **CLI non-interactive mode fix** — The CLI no longer requires a positional `PROJECT_NAME` argument when all flags (`--domain`, `--framework`) are provided. Auto-generates a slug like `healthcare-pydanticai-app`. Also added TTY detection with helpful error messages for CI/CD environments.
+
+### Data Quality Improvements
+- **Document Markdown rendering** — Static document content now uses Markdown headings (`##`) instead of RST-style `===`/`---` separators. The DocumentBrowser component renders content with ReactMarkdown.
+- **Entity-derived document titles** — Document titles now reference primary entities: "Discharge Summary: Maria Elena Gonzalez" instead of generic "Discharge Summary #1".
+- **Realistic entity descriptions** — Replaced generic "Comprehensive patient profile for..." with POLE-type-aware descriptions using domain roles and industries (e.g., "Dr. Sarah Chen, attending physician specializing in healthcare").
+- **Domain-aware Organization.industry** — Added `DOMAIN_INDUSTRY_POOL` for all 22 domains. Healthcare organizations get "Hospital Systems" instead of "Technology".
+- **Realistic decision trace observations** — Observations now reference actual entity names: "Verified Dr. Sarah Chen against healthcare standards" instead of generic "Found 7 relevant records".
+- **Improved thinking text filter** — Added continuation patterns to catch multi-sentence agent thinking blocks between tool calls.
+
+### New Agent Tools (All 22 Domains)
+- **`list_*` tools** — Every domain now has a list tool for its primary entity type (e.g., `list_patients`, `list_players`, `list_accounts`) with sort and limit parameters.
+- **`get_*_by_id` tools** — Every domain now has a direct ID lookup tool that returns the entity with all connections (e.g., `get_patient_by_id`, `get_player_by_id`).
+- **Gaming-specific** — Added `get_top_players` tool (sort by level) for the gaming domain.
+
+### Frontend Improvements
+- **"Ask about this" button** — Clicking a node in the Knowledge Graph shows an "Ask about [entity]" button that sends a query to the chat.
+- **Node hover tooltips** — Graph nodes show full name, labels, and key properties on hover.
+- **Health polling optimization** — Reduced polling frequency from 30s to 60s.
+- **Responsive hint text** — Keyboard shortcut hint hidden on small screens to prevent overlap.
+- **Suggested question max width** — Pill buttons capped at 320px to prevent layout stretching.
+- **Scrollable label badges** — Label filter badges in the graph panel scroll when they overflow.
+- **Seed constraint fix** — Entity seeding now uses `ON CREATE SET / ON MATCH SET` to avoid constraint violations on re-seed.
+
+### Documentation
+- **4 new docs pages** — "Use Neo4j Aura", "Use Docker", "Why Context Graphs?", "Framework Comparison"
+- **Updated sidebars** — All new pages added to Docusaurus navigation
+
+### Testing
+- 602 passing tests (57 new), up from 545
+
 ## v0.6.0 — Comprehensive Testing Feedback (2026-03-28)
 
 ### Framework Fixes

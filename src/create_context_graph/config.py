@@ -56,7 +56,7 @@ FRAMEWORK_DEPENDENCIES = {
     "google-adk": ["google-adk>=0.1", "nest-asyncio>=1.5"],
     "openai-agents": ["openai-agents>=0.1"],
     "langgraph": ["langgraph>=0.1", "langchain-anthropic>=0.3"],
-    "crewai": ["crewai>=0.1"],
+    "crewai": ["crewai[anthropic]>=0.1"],
     "anthropic-tools": ["anthropic>=0.30"],
 }
 
@@ -73,6 +73,7 @@ class ProjectConfig(BaseModel):
     neo4j_password: str = Field(default="password")
     neo4j_type: Literal["docker", "existing", "aura", "local"] = Field(default="docker")
     anthropic_api_key: str | None = Field(default=None)
+    anthropic_base_url: str | None = Field(default=None)
     openai_api_key: str | None = Field(default=None)
     google_api_key: str | None = Field(default=None)
     generate_data: bool = Field(default=False)
