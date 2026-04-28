@@ -302,7 +302,6 @@ class ProjectRenderer:
     def _render_data(self, data_dir: Path, ctx: dict) -> None:
         """Copy ontology and create data directory structure."""
         from create_context_graph.ontology import _get_domains_path
-        
         data_dir.mkdir(parents=True, exist_ok=True)
         (data_dir / "documents").mkdir(exist_ok=True)
 
